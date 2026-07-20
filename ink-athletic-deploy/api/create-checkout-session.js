@@ -28,12 +28,6 @@ async function loadCatalog() {
 }
 
 export default async function handler(req, res) {
-  // TEMP diagnostic: GET reports the key PREFIX (not the secret) + a build marker,
-  // so we can confirm the deploy is fresh and see which key type is loaded.
-  if (req.method === "GET") {
-    const k = process.env.STRIPE_SECRET_KEY || "";
-    return res.status(200).json({ keySet: !!k, keyPrefix: k.slice(0, 8), keyLen: k.length, marker: "diag-A" });
-  }
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Method not allowed" });
@@ -95,13 +89,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ url: session.url });
   } catch (err) {
     console.error("checkout error", err);
-    // TEMP (preview debugging): surface the real reason so we can diagnose fast.
-    return res.status(500).json({
-      error: "Checkout error: " + (err && err.message ? err.message : "unknown"),
-      type: err && err.type,
-      code: err && err.code,
-      where: err && err.stack ? String(err.stack).split("\n").slice(0, 5).join(" | ") : null,
-      bodyType: typeof req.body
-    });
+    return res.status(500).json({ error: "Could not start checkout. Please try again." });
   }
 }
