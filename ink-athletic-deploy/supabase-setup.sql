@@ -21,3 +21,30 @@ create policy "admin insert"
 create policy "admin update"
   on public.site_data for update
   using (auth.role() = 'authenticated');
+
+
+-- ============================================================
+-- PART 2 (added later): image uploads from the Admin CMS.
+-- Run this once in the SQL Editor. Creates a public-read storage
+-- bucket; only the signed-in admin can upload/change images.
+-- ============================================================
+
+insert into storage.buckets (id, name, public)
+values ('site-images', 'site-images', true)
+on conflict (id) do nothing;
+
+create policy "public read site-images"
+  on storage.objects for select
+  using (bucket_id = 'site-images');
+
+create policy "admin upload site-images"
+  on storage.objects for insert
+  with check (bucket_id = 'site-images' and auth.role() = 'authenticated');
+
+create policy "admin update site-images"
+  on storage.objects for update
+  using (bucket_id = 'site-images' and auth.role() = 'authenticated');
+
+create policy "admin delete site-images"
+  on storage.objects for delete
+  using (bucket_id = 'site-images' and auth.role() = 'authenticated');
