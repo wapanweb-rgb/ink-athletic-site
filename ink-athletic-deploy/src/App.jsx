@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { configured, loadData, saveData, adminSignIn } from "./store.js";
+import { DEFAULT_PRODUCTS } from "./catalog.js";
 
 /* ============================================================
    INK ATHLETIC LTD — premium build
@@ -8,57 +9,6 @@ import { configured, loadData, saveData, adminSignIn } from "./store.js";
    ============================================================ */
 
 /* ----------------------------- DATA ----------------------------- */
-
-const DEFAULT_PRODUCTS = [
-  {
-    id: "ai-kiosk",
-    name: "AI Business Kiosk",
-    outcome: "Turn your storefront into a 24/7 digital employee.",
-    line: "A voice-and-touch AI concierge that answers, books, and greets — all day, every day.",
-    price: 2499,
-    features: ["AI assistant", "Touchscreen", "Voice interaction", "NFC", "QR codes", "Live weather", "Business info"],
-    art: "kiosk", image: null
-  },
-  {
-    id: "qr-kiosk",
-    name: "QR Display Kiosk",
-    outcome: "Every phone in the room, one tap from your links.",
-    line: "An always-on display serving rotating QR codes, NFC tap, weather, and announcements.",
-    price: 899,
-    features: ["Multiple QR codes", "NFC", "Weather", "Contact info", "Scrolling announcements"],
-    art: "qr", image: null,
-    addOns: [{ name: "Laser-engraved logo — wood front plate", price: 90 }]
-  },
-  {
-    id: "ai-solutions",
-    name: "Custom AI Solutions",
-    outcome: "Automate repetitive work with intelligent assistants built for your business.",
-    line: "Local AI, automation, and knowledge bases wired into the tools you already use.",
-    price: 1500,
-    features: ["Local AI", "Business automation", "Knowledge bases", "Custom software", "AI integrations"],
-    art: "ai", image: null
-  },
-  {
-    id: "keychain-logo",
-    name: "Laser-Engraved Keychain",
-    outcome: "Your logo, cut and engraved in wood or acrylic.",
-    line: "A custom laser-engraved keychain — perfect for swag, giveaways, or retail.",
-    price: 15,
-    features: ["Custom engraving", "Wood or acrylic", "Bulk discounts"],
-    art: "laser", image: null,
-    buy: true, weightG: 40, boxL: 12, boxW: 8, boxH: 2
-  },
-  {
-    id: "print-3d-small",
-    name: "Custom 3D Print — Small",
-    outcome: "Bring your model to life in durable PLA.",
-    line: "Send us your design — we print, finish, and ship it to your door.",
-    price: 25,
-    features: ["Custom model", "Multiple colors", "Durable PLA"],
-    art: "printer", image: null,
-    buy: true, weightG: 150, boxL: 20, boxW: 15, boxH: 10
-  }
-];
 
 const ART_TYPES = ["kiosk", "qr", "printer", "laser", "ai"];
 
@@ -1556,7 +1506,7 @@ function QuoteDrawer({ open, items, onClose, onRemove, email }) {
   );
 }
 
-function CartDrawer({ open, items, subtotal, onClose, onSetQty, onRemove, onCheckout }) {
+function CartDrawer({ open, items, subtotal, onClose, onSetQty, onRemove, onCheckout, busy }) {
   return (
     <>
       <div className={"scrim" + (open ? " open" : "")} onClick={onClose} />
@@ -1585,7 +1535,7 @@ function CartDrawer({ open, items, subtotal, onClose, onSetQty, onRemove, onChec
               <div className="qn">Subtotal</div>
               <div className="qn">${subtotal.toLocaleString()}</div>
             </div>
-            <button className="btn solid" style={{ width: "100%" }} onClick={onCheckout}>Checkout</button>
+            <button className="btn solid" style={{ width: "100%", opacity: busy ? 0.6 : 1 }} onClick={onCheckout} disabled={busy}>{busy ? "Starting checkout…" : "Checkout"}</button>
           </div>
         )}
       </aside>
@@ -2022,6 +1972,7 @@ export default function App() {
   });
   const [drawer, setDrawer] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
   const [toast, setToast] = useState("");
   const [belowFold, setBelowFold] = useState(false);
   const [adminAuthed, setAdminAuthed] = useState(false);
@@ -2120,10 +2071,39 @@ export default function App() {
     return n;
   });
   const removeFromCart = (id) => setCart(c => { const n = { ...c }; delete n[id]; return n; });
-  const onCheckout = () => {
-    // Phase 1b wires this to /api/create-checkout-session → Stripe Checkout.
-    flash("Secure checkout is being connected — coming next!");
+  const onCheckout = async () => {
+    if (checkingOut) return;
+    setCheckingOut(true);
+    try {
+      const res = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cart })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) { window.location.href = data.url; return; }
+      flash(data.error || "Checkout is temporarily unavailable. Please try again.");
+    } catch (e) {
+      flash("Network error starting checkout. Please try again.");
+    } finally {
+      setCheckingOut(false);
+    }
   };
+
+  // Handle the return trip from Stripe Checkout (success_url / cancel_url).
+  useEffect(() => {
+    const co = new URLSearchParams(window.location.search).get("checkout");
+    if (co === "success") {
+      setCart({});
+      try { localStorage.removeItem("ia_cart"); } catch (e) { /* ignore */ }
+      flash("Thank you! Your order is confirmed. 🎉");
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (co === "cancel") {
+      flash("Checkout canceled — your cart is saved.");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openProduct = (id) => setRoute({ page: "product", id });
   const goHome = () => { setRoute({ page: "home" }); window.scrollTo(0, 0); };
@@ -2172,7 +2152,7 @@ export default function App() {
 
       {!isAdminRoute && <Footer site={site} onAdmin={goAdmin} />}
       <QuoteDrawer open={drawer} items={items} onClose={() => setDrawer(false)} onRemove={removeQuote} email={site.email} />
-      <CartDrawer open={cartOpen} items={cartItems} subtotal={cartSubtotal} onClose={() => setCartOpen(false)} onSetQty={setCartQty} onRemove={removeFromCart} onCheckout={onCheckout} />
+      <CartDrawer open={cartOpen} items={cartItems} subtotal={cartSubtotal} onClose={() => setCartOpen(false)} onSetQty={setCartQty} onRemove={removeFromCart} onCheckout={onCheckout} busy={checkingOut} />
       <div className={"toast" + (toast ? " show" : "")}>{toast}</div>
     </>
   );
