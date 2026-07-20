@@ -90,6 +90,12 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("checkout error", err);
     // TEMP (preview debugging): surface the real reason so we can diagnose fast.
-    return res.status(500).json({ error: "Checkout error: " + (err && err.message ? err.message : "unknown") });
+    return res.status(500).json({
+      error: "Checkout error: " + (err && err.message ? err.message : "unknown"),
+      type: err && err.type,
+      code: err && err.code,
+      where: err && err.stack ? String(err.stack).split("\n").slice(0, 5).join(" | ") : null,
+      bodyType: typeof req.body
+    });
   }
 }
