@@ -35,6 +35,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ rates });
   } catch (err) {
     console.error("shipping-rates error", err);
-    return res.status(500).json({ error: "Could not fetch shipping rates. Please try again." });
+    // TEMP debug
+    return res.status(500).json({
+      error: "Could not fetch shipping rates.",
+      detail: err && err.message ? err.message : String(err),
+      where: err && err.stack ? String(err.stack).split("\n").slice(0, 4).join(" | ") : null
+    });
   }
 }
