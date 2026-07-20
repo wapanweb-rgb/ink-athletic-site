@@ -1,31 +1,16 @@
 // Serverless checkout — runs on Vercel, never in the browser. Creates a Stripe
-// Checkout Session for the cart and returns its hosted-payment URL. Prices come
-// from the server-side catalog (Supabase, falling back to code defaults), so a
-// tampered browser can't change what the customer is charged.
+// Checkout Session for the cart and returns its hosted-payment URL. Product
+// prices AND the shipping amount are resolved server-side (catalog + a fresh
+// Shippo re-quote), so a tampered browser can't change what's charged.
 //
-// Requires the STRIPE_SECRET_KEY environment variable (set in Vercel → Settings
-// → Environment Variables). Use the TEST key (sk_test_…) until you go live.
+// Env vars (Vercel → Settings → Environment Variables):
+//   STRIPE_SECRET_KEY  — sk_test_… until launch, then sk_live_… on Production
+//   SHIPPO_API_TOKEN   — shippo_test_… until launch
 
 import Stripe from "stripe";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../src/config.js";
-import { DEFAULT_PRODUCTS } from "../src/catalog.js";
+import { loadCatalog, buildParcel, getShippoRates } from "../src/shipping-lib.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
-
-async function loadCatalog() {
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/site_data?key=eq.products&select=value`,
-      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
-    );
-    if (res.ok) {
-      const rows = await res.json();
-      const value = rows && rows[0] && rows[0].value;
-      if (Array.isArray(value) && value.length) return value;
-    }
-  } catch (e) { /* fall through to code defaults */ }
-  return DEFAULT_PRODUCTS;
-}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -38,6 +23,8 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const cart = body.cart || {};
+    const address = body.address || {};
+    const serviceToken = String(body.serviceToken || "");
 
     const catalog = await loadCatalog();
     const byId = Object.fromEntries(catalog.map((p) => [p.id, p]));
@@ -62,6 +49,49 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Your cart is empty or has no purchasable items." });
     }
 
+    // Server-side shipping: re-quote Shippo fresh and use OUR amount for the
+    // service the customer picked. Falls back to a flat rate if unavailable.
+    let shippingOption = {
+      shipping_rate_data: {
+        type: "fixed_amount",
+        fixed_amount: { amount: 1500, currency: "cad" },
+        display_name: "Canada Post (flat rate)",
+        delivery_estimate: {
+          minimum: { unit: "business_day", value: 3 },
+          maximum: { unit: "business_day", value: 9 }
+        }
+      }
+    };
+    if (process.env.SHIPPO_API_TOKEN && serviceToken && address.postalCode) {
+      const addressTo = {
+        zip: String(address.postalCode || "").trim(),
+        state: String(address.province || "").trim(),
+        city: String(address.city || "").trim(),
+        country: "CA"
+      };
+      const parcel = buildParcel(cart, catalog);
+      const { rates } = await getShippoRates({ token: process.env.SHIPPO_API_TOKEN, addressTo, parcel });
+      const chosen = rates.find((r) => r.serviceToken === serviceToken);
+      if (!chosen) {
+        return res.status(400).json({ error: "That shipping option is no longer available — please re-check rates." });
+      }
+      shippingOption = {
+        shipping_rate_data: {
+          type: "fixed_amount",
+          fixed_amount: { amount: Math.round(chosen.amount * 100), currency: "cad" },
+          display_name: `${chosen.carrier} ${chosen.service}`,
+          ...(chosen.days
+            ? {
+                delivery_estimate: {
+                  minimum: { unit: "business_day", value: chosen.days },
+                  maximum: { unit: "business_day", value: chosen.days + 2 }
+                }
+              }
+            : {})
+        }
+      };
+    }
+
     const origin = req.headers.origin || `https://${req.headers.host}`;
 
     const session = await stripe.checkout.sessions.create({
@@ -69,19 +99,7 @@ export default async function handler(req, res) {
       line_items,
       shipping_address_collection: { allowed_countries: ["CA"] },
       phone_number_collection: { enabled: true },
-      shipping_options: [
-        {
-          shipping_rate_data: {
-            type: "fixed_amount",
-            fixed_amount: { amount: 1500, currency: "cad" },
-            display_name: "Canada Post (flat rate — live rates coming soon)",
-            delivery_estimate: {
-              minimum: { unit: "business_day", value: 3 },
-              maximum: { unit: "business_day", value: 9 }
-            }
-          }
-        }
-      ],
+      shipping_options: [shippingOption],
       success_url: `${origin}/?checkout=success`,
       cancel_url: `${origin}/?checkout=cancel`
     });

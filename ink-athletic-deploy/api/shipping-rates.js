@@ -27,20 +27,14 @@ export default async function handler(req, res) {
 
     const catalog = await loadCatalog();
     const parcel = buildParcel(cart, catalog);
-    const { rates, messages } = await getShippoRates({ token, addressTo, parcel });
+    const { rates } = await getShippoRates({ token, addressTo, parcel });
 
     if (!rates.length) {
-      // TEMP debug: include Shippo's own messages to see why no rates came back
-      return res.status(200).json({ rates: [], note: "No shipping rates available for this address yet.", messages, parcel });
+      return res.status(200).json({ rates: [], note: "No shipping rates available for this address yet." });
     }
     return res.status(200).json({ rates });
   } catch (err) {
     console.error("shipping-rates error", err);
-    // TEMP debug
-    return res.status(500).json({
-      error: "Could not fetch shipping rates.",
-      detail: err && err.message ? err.message : String(err),
-      where: err && err.stack ? String(err.stack).split("\n").slice(0, 4).join(" | ") : null
-    });
+    return res.status(500).json({ error: "Could not fetch shipping rates. Please try again." });
   }
 }
