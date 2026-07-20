@@ -31,25 +31,5 @@ export const DEFAULT_PRODUCTS = [
     price: 1500,
     features: ["Local AI", "Business automation", "Knowledge bases", "Custom software", "AI integrations"],
     art: "ai", image: null
-  },
-  {
-    id: "keychain-logo",
-    name: "Laser-Engraved Keychain",
-    outcome: "Your logo, cut and engraved in wood or acrylic.",
-    line: "A custom laser-engraved keychain — perfect for swag, giveaways, or retail.",
-    price: 15,
-    features: ["Custom engraving", "Wood or acrylic", "Bulk discounts"],
-    art: "laser", image: null,
-    buy: true, weightG: 40, boxL: 12, boxW: 8, boxH: 2
-  },
-  {
-    id: "print-3d-small",
-    name: "Custom 3D Print — Small",
-    outcome: "Bring your model to life in durable PLA.",
-    line: "Send us your design — we print, finish, and ship it to your door.",
-    price: 25,
-    features: ["Custom model", "Multiple colors", "Durable PLA"],
-    art: "printer", image: null,
-    buy: true, weightG: 150, boxL: 20, boxW: 15, boxH: 10
   }
 ];
