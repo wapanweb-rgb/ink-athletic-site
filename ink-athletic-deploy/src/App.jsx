@@ -81,16 +81,17 @@ const SITE_DEFAULTS = {
   ctaA: "Build the", ctaEm: "future-feel.",
   ctaP: "Tell us what your business needs to do. We'll spec it, quote it, and build it.",
   ctaBtn: "Start a conversation",
-  email: "hello@inkathletic.com",
+  email: "brandon@inkathletic.ca",
   footerBlurb: "Kiosks and custom AI, built for real-world businesses.",
-  city: "Fort St. John, British Columbia", country: "Canada",
+  address: "9711 100th Ave, Unit 208 (upstairs)",
+  city: "Fort St. John, British Columbia", postal: "V1J 1Y2", country: "Canada",
   bottomLine: "Indigenous owned and operated",
   founder: {
     eyebrow: "The Team",
     heading: "Meet the founder",
-    name: "Brandon",
+    name: "Brandon Cameron",
     role: "Founder & Owner",
-    bio: "Add your bio here — a few sentences on your background, what drives Ink Athletic, and the experience you bring to every build. You can edit all of this anytime from the Admin panel.",
+    bio: "A member of Saulteau First Nations in Moberly Lake, BC, Brandon Cameron founded Ink Athletic to bring big-technology thinking to everyday businesses. With an education in Marketing and Advertising from UBC and extensive experience in web design and AI architecture, he leads every build from first concept through on-site install.",
     email: "brandon@inkathletic.ca",
     photo: ""
   }
@@ -1446,7 +1447,7 @@ function OrbCinema({ site }) {
   );
 }
 
-function ProductPage({ p, products, onBack, onOpen, onQuote }) {
+function ProductPage({ p, products, onBack, onOpen, onQuote, site }) {
   useEffect(() => { window.scrollTo(0, 0); }, [p.id]);
   const related = products.filter(x => x.id !== p.id).slice(0, 3);
   return (
@@ -1476,7 +1477,7 @@ function ProductPage({ p, products, onBack, onOpen, onQuote }) {
           <div className="pp-cta">
             <button className="btn solid" onClick={() => onQuote(p.id)}>Add to Quote</button>
             <a className="btn ghost" style={{ textDecoration: "none" }}
-               href={"mailto:hello@inkathletic.com?subject=" + encodeURIComponent(p.name + " — inquiry")}>Ask a question</a>
+               href={"mailto:" + site.email + "?subject=" + encodeURIComponent(p.name + " — inquiry")}>Ask a question</a>
           </div>
         </div>
       </div>
@@ -1492,7 +1493,7 @@ function ProductPage({ p, products, onBack, onOpen, onQuote }) {
   );
 }
 
-function QuoteDrawer({ open, items, onClose, onRemove }) {
+function QuoteDrawer({ open, items, onClose, onRemove, email }) {
   const total = items.reduce((s, it) => s + it.p.price * it.qty, 0);
   const body = encodeURIComponent(
     "Hi Ink Athletic,\n\nI'd like a quote for:\n" +
@@ -1522,7 +1523,7 @@ function QuoteDrawer({ open, items, onClose, onRemove }) {
             <div className="qn">${total.toLocaleString()}</div>
           </div>
         )}
-        <a className="btn solid" href={"mailto:hello@inkathletic.com?subject=Quote%20request&body=" + body}
+        <a className="btn solid" href={"mailto:" + email + "?subject=Quote%20request&body=" + body}
            style={{ opacity: items.length ? 1 : 0.4, pointerEvents: items.length ? "auto" : "none" }}>
           Request Quote
         </a>
@@ -1554,7 +1555,9 @@ function Footer({ site, onAdmin }) {
         </div>
         <div className="f-col">
           <h4>Location</h4>
+          {site.address && <span>{site.address}</span>}
           <span>{site.city}</span>
+          {site.postal && <span>{site.postal}</span>}
           <span>{site.country}</span>
         </div>
       </div>
@@ -1834,10 +1837,12 @@ function SiteForm({ site, setSite }) {
         <div className="field"><label>Contact email</label><input value={draft.email} onChange={set("email")} /></div>
       </div>
       <div className="field"><label>Footer blurb</label><input value={draft.footerBlurb} onChange={set("footerBlurb")} /></div>
+      <div className="field"><label>Street address</label><input value={draft.address} onChange={set("address")} /></div>
       <div className="grid2">
         <div className="field"><label>City / region</label><input value={draft.city} onChange={set("city")} /></div>
-        <div className="field"><label>Country</label><input value={draft.country} onChange={set("country")} /></div>
+        <div className="field"><label>Postal code</label><input value={draft.postal} onChange={set("postal")} /></div>
       </div>
+      <div className="field"><label>Country</label><input value={draft.country} onChange={set("country")} /></div>
       <div className="field"><label>Footer bottom line</label><input value={draft.bottomLine} onChange={set("bottomLine")} /></div>
 
       <div className="formbtns">
@@ -2021,7 +2026,7 @@ export default function App() {
           ? <AdminPanel products={products} setProducts={setProducts} site={site} setSite={setSite} onBack={goHome} />
           : <AdminLogin onSuccess={() => setAdminAuthed(true)} onBack={goHome} />
       ) : product ? (
-        <ProductPage p={product} products={products} onBack={goStore} onOpen={openProduct} onQuote={addQuote} />
+        <ProductPage p={product} products={products} onBack={goStore} onOpen={openProduct} onQuote={addQuote} site={site} />
       ) : (
         <main>
           <OrbCinema site={site} key={site.titleLine + site.heroH1a + site.heroH1b} />
@@ -2042,7 +2047,7 @@ export default function App() {
       )}
 
       {!isAdminRoute && <Footer site={site} onAdmin={goAdmin} />}
-      <QuoteDrawer open={drawer} items={items} onClose={() => setDrawer(false)} onRemove={removeQuote} />
+      <QuoteDrawer open={drawer} items={items} onClose={() => setDrawer(false)} onRemove={removeQuote} email={site.email} />
       <div className={"toast" + (toast ? " show" : "")}>{toast}</div>
     </>
   );
