@@ -5,7 +5,7 @@
 
 // Store categories — shown as filter pills above the product carousel.
 // "Software & Hardware" is special: its tab shows the custom-build quote form.
-export const CATEGORIES = ["Kiosks", "Web Development", "3D Prints", "Software & Hardware"];
+export const CATEGORIES = ["Kiosks", "3D Prints", "Web Development", "Software & Hardware"];
 
 export const DEFAULT_PRODUCTS = [
   {
