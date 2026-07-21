@@ -1598,38 +1598,45 @@ function ProcessCard({ s, i, open, total }) {
       // content-visibility:auto keeps off-screen sections unmeasured (0-size);
       // placement must wait until the card is actually rendered.
       if (cr.width < 60 || cr.height < 60) return false;
-      const tr = txt.getBoundingClientRect(), nr = num.getBoundingClientRect();
-      const ex = {
-        l: Math.min(tr.left, nr.left) - cr.left - 10,
-        t: Math.min(tr.top, nr.top) - cr.top - 10,
-        r: Math.max(tr.right, nr.right) - cr.left + 10,
-        b: Math.max(tr.bottom, nr.bottom) - cr.top + 10
-      };
+      // Exclusion halo from the ACTUAL text elements (h3 + p + number badge),
+      // not their wrapper column (which stretches the full card width).
+      const parts = [num, txt.querySelector("h3"), txt.querySelector("p")].filter(Boolean);
+      let exl = Infinity, ext = Infinity, exr = -Infinity, exb = -Infinity;
+      for (const el of parts) {
+        const r = el.getBoundingClientRect();
+        exl = Math.min(exl, r.left); ext = Math.min(ext, r.top);
+        exr = Math.max(exr, r.right); exb = Math.max(exb, r.bottom);
+      }
+      const ex = { l: exl - cr.left - 10, t: ext - cr.top - 10, r: exr - cr.left + 10, b: exb - cr.top + 10 };
       const placed = [];
       const target = 3 + Math.floor(Math.random() * 5);
-      for (let tries = 0; placed.length < target && tries < 260; tries++) {
-        const size = 34 + Math.pow(Math.random(), 1.5) * 54; // 34-88px
-        if (size > cr.width - 12 || size > cr.height - 12) continue;
-        const x = 5 + Math.random() * (cr.width - size - 10);
-        const y = 5 + Math.random() * (cr.height - size - 10);
-        if (!(x + size < ex.l || x > ex.r || y + size < ex.t || y > ex.b)) continue; // in text halo
-        let ok = true;
-        for (const p of placed) {
-          if (!(x + size + 6 < p.x || x > p.x + p.size + 6 || y + size + 6 < p.y || y > p.y + p.size + 6)) { ok = false; break; }
+      const tryPlace = (minS, maxS, budget) => {
+        for (let tries = 0; placed.length < target && tries < budget; tries++) {
+          const size = minS + Math.pow(Math.random(), 1.5) * (maxS - minS);
+          if (size > cr.width - 12 || size > cr.height - 12) continue;
+          const x = 5 + Math.random() * (cr.width - size - 10);
+          const y = 5 + Math.random() * (cr.height - size - 10);
+          if (!(x + size < ex.l || x > ex.r || y + size < ex.t || y > ex.b)) continue; // in text halo
+          let ok = true;
+          for (const p of placed) {
+            if (!(x + size + 6 < p.x || x > p.x + p.size + 6 || y + size + 6 < p.y || y > p.y + p.size + 6)) { ok = false; break; }
+          }
+          if (!ok) continue;
+          placed.push({
+            x, y, size,
+            g: Math.floor(Math.random() * GLYPHS.length),
+            rot: (Math.random() - 0.5) * 56,
+            flip: Math.random() < 0.5,
+            delay: Math.random() * 4,
+            dur: 3.4 + Math.random() * 2.8
+          });
         }
-        if (!ok) continue;
-        placed.push({
-          x, y, size,
-          g: Math.floor(Math.random() * GLYPHS.length),
-          rot: (Math.random() - 0.5) * 56,
-          flip: Math.random() < 0.5,
-          delay: Math.random() * 4,
-          dur: 3.4 + Math.random() * 2.8
-        });
-      }
+      };
+      tryPlace(34, 88, 260);          // big marks first
+      if (placed.length < 3) tryPlace(20, 44, 200); // squeeze smaller ones into leftover gaps
       setMarks(placed);
-      placedRef.current = true;
-      return true;
+      placedRef.current = placed.length > 0;
+      return placed.length > 0;
     };
     let t = 0, tries = 0;
     const attempt = () => {
