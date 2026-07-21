@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     for (const [id, qtyRaw] of Object.entries(cart)) {
       const p = byId[id];
       const qty = Math.max(1, Math.min(99, parseInt(qtyRaw, 10) || 0));
-      if (!p || !p.buy) continue;
+      if (!p || !p.buy || !p.inStock) continue; // out-of-stock items can never be purchased
       const unit_amount = Math.round((Number(p.price) || 0) * 100);
       if (unit_amount <= 0) continue;
       line_items.push({

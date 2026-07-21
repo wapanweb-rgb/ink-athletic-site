@@ -4,7 +4,8 @@
 // tampered browser can't change what a customer is charged.
 
 // Store categories — shown as filter pills above the product carousel.
-export const CATEGORIES = ["Software & Hardware", "Kiosks", "3D Prints", "Websites"];
+// "Software & Hardware" is special: its tab shows the custom-build quote form.
+export const CATEGORIES = ["Kiosks", "Web Development", "3D Prints", "Software & Hardware"];
 
 export const DEFAULT_PRODUCTS = [
   {
@@ -37,5 +38,15 @@ export const DEFAULT_PRODUCTS = [
     features: ["Local AI", "Business automation", "Knowledge bases", "Custom software", "AI integrations"],
     art: "ai", image: null,
     category: "Software & Hardware"
+  },
+  {
+    id: "web-development",
+    name: "Website Development",
+    outcome: "A custom website that works as hard as you do.",
+    line: "Design, build, and launch — fast, mobile-first sites with e-commerce, booking, and a CMS you can edit yourself.",
+    price: 1200,
+    features: ["Custom design", "Mobile-first", "E-commerce ready", "SEO", "Editable CMS", "Hosting & domains"],
+    art: "qr", image: null,
+    category: "Web Development"
   }
 ];
