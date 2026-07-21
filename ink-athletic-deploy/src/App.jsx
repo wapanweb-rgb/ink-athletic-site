@@ -1429,7 +1429,7 @@ function GlassCarousel({ products, onOpen, onQuote, onBuy }) {
   );
 }
 
-const BUSINESS_TYPES = ["Small business owner", "Shop / retail storefront", "Online store", "Commercial business", "Government", "Non-profit", "Other"];
+const BUSINESS_TYPES = ["Small business owner", "Shop / retail storefront", "Online store", "Commercial business", "Government", "Indigenous organization", "Non-profit", "Other"];
 
 /* "Software & Hardware" tab — a custom-build inquiry. Composes an email with
    the answers so it lands straight in the inbox as a quote request. */
