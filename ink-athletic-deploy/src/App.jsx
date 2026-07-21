@@ -2271,110 +2271,125 @@ function GreenBG() {
     const rnd = Math.random;
     const J = (a, b) => a + rnd() * (b - a);
     const sm = (t) => t * t * (3 - 2 * t);
-    const sparks = []; // growth particles
+    const sparks = [];
 
-    /* ---- build a bonsai in one of four classic styles ---- */
     const build = () => {
-      unit = Math.min(H, 1000);
-      baseY = H * 0.84;
-      const style = Math.floor(rnd() * 4); // 0 informal upright, 1 slant, 2 windswept, 3 semi-cascade
+      unit = Math.min(H, 1100);
+      baseY = H * 0.87;
+      const style = Math.floor(rnd() * 4); // informal / slant / windswept / semi-cascade
       const wind = rnd() < 0.5 ? -1 : 1;
       baseX = (W > 760 ? W * 0.60 : W * 0.5) - (style === 3 ? wind * unit * 0.05 : 0);
-      const branches = [], pads = [], roots = [], grass = [], knots = [];
+      const branches = [], pads = [], grass = [], hangs = [], nodes = [];
+      const spine = [];
 
+      /* ---- trunk spine: sampled path the braid will follow ---- */
+      const segAngles = [];
+      if (style === 0) { const s0 = rnd() < 0.5 ? 1 : -1; segAngles.push(J(-0.08, 0.08), s0 * J(0.35, 0.55), -s0 * J(0.3, 0.5), s0 * J(0.2, 0.35)); }
+      else if (style === 1) { segAngles.push(wind * J(0.4, 0.55), wind * J(0.5, 0.65), wind * J(0.35, 0.5), wind * J(0.45, 0.6)); }
+      else if (style === 2) { segAngles.push(wind * J(0.5, 0.65), wind * J(0.7, 0.85), wind * J(0.8, 0.95), wind * J(0.9, 1.05)); }
+      else { segAngles.push(wind * -0.12, wind * J(0.7, 0.9), wind * J(1.9, 2.2), wind * J(2.4, 2.7)); }
+      const segLens = style === 3 ? [0.22, 0.16, 0.16, 0.15] : [0.25, 0.20, 0.155, 0.125];
+      let sx = baseX, sy = baseY - unit * 0.006, sw = unit * 0.054, gC = 0.02;
+      for (let i = 0; i < 4; i++) {
+        const ang = segAngles[i], len = unit * segLens[i];
+        const bend = (rnd() - 0.5) * 0.3;
+        const a1 = ang + bend * 0.5, a2 = ang + bend;
+        const mx = sx + Math.sin(a1) * len * 0.55, my = sy - Math.cos(a1) * len * 0.55;
+        const ex = mx + Math.sin(a2) * len * 0.45, ey = my - Math.cos(a2) * len * 0.45;
+        const g1 = gC + 0.105, w1 = sw * 0.74;
+        for (let k = 0; k < 10; k++) {
+          const t = k / 10;
+          spine.push({
+            x: (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * mx + t * t * ex,
+            y: (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * my + t * t * ey,
+            w: sw + (w1 - sw) * t, g: gC + (g1 - gC) * t
+          });
+        }
+        sx = ex; sy = ey; sw = w1; gC = g1 - 0.012;
+        nodes.push({ x: ex, y: ey, ang: a2, g: g1, i });
+      }
+      spine.push({ x: sx, y: sy, w: sw, g: gC + 0.012 });
+      // precompute normals + braid phase axis
+      for (let j = 0; j < spine.length; j++) {
+        const a = spine[Math.max(0, j - 1)], b = spine[Math.min(spine.length - 1, j + 1)];
+        const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
+        spine[j].nx = -dy / L; spine[j].ny = dx / L; spine[j].u = j / (spine.length - 1);
+      }
+      const strands = [];
+      const NS = 5;
+      for (let i = 0; i < NS; i++) strands.push({ phase: (i / NS) * 6.283 + J(-0.3, 0.3), freq: J(1.6, 2.3), wf: J(0.30, 0.42), tint: J(-0.1, 0.12) });
+
+      /* ---- limbs (branches) as smooth tapered polylines ---- */
       const limb = (x, y, ang, len, w0, w1, g0, g1, z, bendMag) => {
         const bend = (rnd() - 0.5) * bendMag;
         const a1 = ang + bend * 0.6, a2 = ang + bend;
         const mx = x + Math.sin(a1) * len * 0.55, my = y - Math.cos(a1) * len * 0.55;
         const ex = mx + Math.sin(a2) * len * 0.45, ey = my - Math.cos(a2) * len * 0.45;
         const pts = [];
-        for (let k = 0; k <= 15; k++) {
-          const t = k / 15;
+        for (let k = 0; k <= 14; k++) {
+          const t = k / 14;
           const ix = (1 - t) * (1 - t) * x + 2 * (1 - t) * t * mx + t * t * ex;
           const iy = (1 - t) * (1 - t) * y + 2 * (1 - t) * t * my + t * t * ey;
-          const wob = Math.sin(t * 11 + len * 0.7) * w0 * 0.09;
+          const wob = Math.sin(t * 12 + len * 0.8) * w0 * 0.10;
           pts.push([ix + wob, iy]);
         }
-        branches.push({ pts, w0, w1: Math.max(1, w1), g0, g1, z, tint: J(-0.06, 0.06), sd: rnd() * 100 });
+        branches.push({ pts, w0, w1: Math.max(0.8, w1), g0, g1, z, tint: J(-0.08, 0.08) });
         return [ex, ey, a2, g1];
       };
       const mkPad = (x, y, rx, ry, z, g0) => {
-        const leaves = [];
-        const n = Math.round((rx * ry) / 13) + 46;
+        const leaves = [], twigs = [];
+        for (let i = 0; i < 6; i++) {
+          const a = rnd() * 6.283;
+          twigs.push({ x2: Math.cos(a) * rx * J(0.4, 0.85), y2: Math.sin(a) * ry * J(0.4, 0.85) });
+        }
+        const n = Math.round((rx * ry) / 12) + 50;
         for (let i = 0; i < n; i++) {
-          const a = rnd() * 6.283, rr = Math.pow(rnd(), 0.7);
+          const a = rnd() * 6.283, rr = Math.pow(rnd(), 0.65);
           const dx = Math.cos(a) * rx * rr, dy = Math.sin(a) * ry * rr;
           const k = Math.max(0, Math.min(1, 0.55 - (dx / rx) * 0.2 - (dy / ry) * 0.42 + (rnd() - 0.5) * 0.3));
-          leaves.push({ dx, dy, rot: rnd() * 3.14, s: unit * (0.0022 + rnd() * 0.0022), g: Math.min(0.985, g0 + rnd() * 0.07), k });
+          leaves.push({ dx, dy, rot: rnd() * 3.14, s: unit * (0.0022 + rnd() * 0.0021), g: Math.min(0.985, g0 + rnd() * 0.07), k });
         }
-        pads.push({ x, y, rx, ry, z, g0, leaves, ph: rnd() * 6.28, cv: null, popped: false });
+        pads.push({ x, y, rx, ry, z, g0, leaves, twigs, ph: rnd() * 6.28, cv: null, popped: false });
       };
 
-      // ---- trunk spine ----
-      const segAngles = [];
-      if (style === 0) { let s0 = rnd() < 0.5 ? 1 : -1; segAngles.push(J(-0.1, 0.1), s0 * J(0.35, 0.55), -s0 * J(0.3, 0.5), s0 * J(0.2, 0.35)); }
-      else if (style === 1) { const d = wind; segAngles.push(d * J(0.4, 0.55), d * J(0.5, 0.65), d * J(0.35, 0.5), d * J(0.45, 0.6)); }
-      else if (style === 2) { segAngles.push(wind * J(0.5, 0.65), wind * J(0.7, 0.85), wind * J(0.8, 0.95), wind * J(0.9, 1.05)); }
-      else { segAngles.push(wind * -0.15, wind * J(0.7, 0.9), wind * J(1.9, 2.2), wind * J(2.4, 2.7)); }
-
-      let x = baseX, y = baseY, ang = 0, wl = unit * 0.036, len = unit * 0.21;
-      const nodes = [];
-      let gCursor = 0.02;
-      for (let i = 0; i < segAngles.length; i++) {
-        ang = segAngles[i];
-        const g1 = gCursor + 0.12;
-        const r = limb(x, y, ang, len, wl, wl * 0.72, gCursor, g1, 0, 0.35);
-        knots.push({ x: r[0], y: r[1], r: wl * 0.4, g: g1 });
-        nodes.push({ x: r[0], y: r[1], ang: r[2], g: g1, i });
-        x = r[0]; y = r[1]; gCursor = g1 - 0.015;
-        len *= style === 3 && i >= 1 ? 0.9 : 0.78;
-        wl *= 0.72;
-      }
-      // secondary gnarl line hugging the lower trunk
-      limb(baseX + unit * 0.012, baseY, segAngles[0] + J(-0.15, 0.15), unit * 0.17, unit * 0.016, unit * 0.008, 0.04, 0.2, -0.5, 0.5);
-
-      // ---- primary branches + foliage tiers ----
-      const tierLen = [0.19, 0.16, 0.13, 0.10];
+      const tierLen = [0.23, 0.19, 0.155, 0.12];
       nodes.forEach((nd, i) => {
         if (i === 0 && style !== 3) return;
         const nP = style === 2 ? 1 : (i < 2 ? 1 : (rnd() < 0.6 ? 1 : 2));
         for (let p = 0; p < nP; p++) {
-          let dir;
-          if (style === 2) dir = wind;
-          else dir = ((i + p) % 2 ? -1 : 1) * (rnd() < 0.88 ? 1 : -1);
+          const dir = style === 2 ? wind : ((i + p) % 2 ? -1 : 1) * (rnd() < 0.88 ? 1 : -1);
           const bAng = dir * J(1.25, 1.55) + nd.ang * 0.25;
-          const bLen = unit * (tierLen[Math.min(i, 3)]) * J(0.85, 1.15) * (style === 2 ? 1.25 : 1);
+          const bLen = unit * tierLen[Math.min(i, 3)] * J(0.85, 1.15) * (style === 2 ? 1.25 : 1);
           const g0 = nd.g + 0.02;
-          const b1 = limb(nd.x, nd.y, bAng, bLen * 0.6, unit * 0.011, unit * 0.006, g0, g0 + 0.09, dir * 0.35, 0.7);
-          const b2 = limb(b1[0], b1[1], b1[2] + dir * J(-0.1, 0.35) - 0.12 * dir, bLen * 0.4, unit * 0.006, unit * 0.003, b1[3] - 0.02, b1[3] + 0.07, dir * 0.35, 0.6);
-          const prx = unit * (0.052 + (3 - Math.min(i, 3)) * 0.007) * J(0.9, 1.1);
-          mkPad(b2[0], b2[1] - unit * 0.012, prx, prx * 0.42, dir * 0.35, b2[3]);
-          if (rnd() < 0.55) mkPad(b1[0] - dir * unit * 0.01, b1[1] - unit * 0.014, prx * 0.6, prx * 0.27, -dir * 0.3, b2[3] + 0.03);
+          const b1 = limb(nd.x, nd.y, bAng, bLen * 0.6, unit * 0.012, unit * 0.006, g0, g0 + 0.085, dir * 0.35, 0.7);
+          const b2 = limb(b1[0], b1[1], b1[2] + dir * J(-0.1, 0.35) - 0.12 * dir, bLen * 0.4, unit * 0.006, unit * 0.0028, b1[3] - 0.02, b1[3] + 0.065, dir * 0.35, 0.6);
+          const prx = unit * (0.06 + (3 - Math.min(i, 3)) * 0.009) * J(0.9, 1.12);
+          mkPad(b2[0], b2[1] - unit * 0.013, prx, prx * 0.42, dir * 0.35, b2[3]);
+          if (rnd() < 0.55) mkPad(b1[0] - dir * unit * 0.012, b1[1] - unit * 0.016, prx * 0.62, prx * 0.27, -dir * 0.3, b2[3] + 0.03);
         }
       });
-      // ---- apex crown (dome) or cascade tail ----
-      const top = nodes[nodes.length - 1];
+      const top = nodes[3];
       if (style !== 3) {
-        const spread = [-0.8, -0.15, 0.5];
-        spread.forEach((sa, i) => {
-          const t = limb(top.x, top.y, sa + J(-0.12, 0.12), unit * J(0.07, 0.11), unit * 0.008, unit * 0.004, top.g + 0.02 + i * 0.02, top.g + 0.12 + i * 0.02, (i % 2 ? -0.3 : 0.3), 0.6);
-          mkPad(t[0], t[1] - unit * 0.012, unit * J(0.05, 0.068), unit * J(0.024, 0.03), (i % 2 ? -0.3 : 0.3), t[3]);
+        [-0.8, -0.15, 0.5].forEach((sa, i) => {
+          const t = limb(top.x, top.y, sa + J(-0.12, 0.12), unit * J(0.08, 0.12), unit * 0.008, unit * 0.0035, top.g + 0.02 + i * 0.02, top.g + 0.11 + i * 0.02, (i % 2 ? -0.3 : 0.3), 0.6);
+          mkPad(t[0], t[1] - unit * 0.013, unit * J(0.055, 0.075), unit * J(0.026, 0.033), (i % 2 ? -0.3 : 0.3), t[3]);
         });
-        mkPad(top.x, top.y - unit * 0.09, unit * 0.085, unit * 0.038, 0.05, Math.min(0.96, top.g + 0.22));
+        mkPad(top.x, top.y - unit * 0.10, unit * 0.095, unit * 0.042, 0.05, Math.min(0.955, top.g + 0.2));
       } else {
-        const t = limb(top.x, top.y, wind * 2.8, unit * 0.1, unit * 0.008, unit * 0.004, top.g + 0.02, top.g + 0.12, 0.2, 0.5);
-        mkPad(t[0], t[1] + unit * 0.005, unit * 0.055, unit * 0.026, 0.2, t[3]);
-        mkPad(nodes[1].x - wind * unit * 0.02, nodes[1].y - unit * 0.05, unit * 0.06, unit * 0.028, -0.2, nodes[1].g + 0.15);
+        const t = limb(top.x, top.y, wind * 2.8, unit * 0.11, unit * 0.008, unit * 0.0035, top.g + 0.02, top.g + 0.11, 0.2, 0.5);
+        mkPad(t[0], t[1] + unit * 0.005, unit * 0.06, unit * 0.028, 0.2, t[3]);
+        mkPad(nodes[1].x - wind * unit * 0.022, nodes[1].y - unit * 0.055, unit * 0.066, unit * 0.03, -0.2, nodes[1].g + 0.15);
       }
-      // ---- roots & grass ----
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 7 - 0.5) * 2.8 + J(-0.1, 0.1);
-        roots.push({ x0: baseX + Math.sin(a) * unit * 0.011, y0: baseY - unit * 0.02, x1: baseX + Math.sin(a) * unit * (0.05 + rnd() * 0.028), y1: baseY + unit * 0.006, w: unit * (0.0065 + rnd() * 0.007) });
+      // hanging aerial roots (ficus signature)
+      const nH = 2 + Math.floor(rnd() * 2);
+      for (let i = 0; i < nH; i++) {
+        const s = spine[6 + Math.floor(rnd() * 12)];
+        hangs.push({ x: s.x + J(-6, 6), y: s.y, dx: J(-0.03, 0.03) * unit, g0: 0.5 + rnd() * 0.2, ph: rnd() * 6.28 });
       }
-      for (let i = 0; i < 12; i++) grass.push({ x: baseX + (rnd() - 0.5) * unit * 0.18, l: unit * (0.008 + rnd() * 0.012), a: (rnd() - 0.5) * 0.9, ph: rnd() * 6.28 });
+      for (let i = 0; i < 12; i++) grass.push({ x: baseX + (rnd() - 0.5) * unit * 0.2, l: unit * (0.009 + rnd() * 0.013), a: (rnd() - 0.5) * 0.9, ph: rnd() * 6.28 });
       pads.sort((a, b) => a.z - b.z);
       branches.sort((a, b) => a.z - b.z);
-      tree = { branches, pads, roots, grass, knots, style };
+      tree = { spine, strands, branches, pads, grass, hangs, nodes, style };
     };
 
     const resize = () => {
@@ -2386,82 +2401,142 @@ function GreenBG() {
     };
     addEventListener("resize", resize); resize();
 
-    /* ---- palettes: ficus-grey bark, deep-to-lit foliage ---- */
-    const bark = (z, tint) => {
-      const l = (z < -0.1 ? 0.82 : 1) * (1 + tint);
-      const r = Math.round(126 * l), g2 = Math.round(118 * l), b = Math.round(106 * l);
-      return "rgb(" + r + "," + g2 + "," + b + ")";
-    };
     const leafCol = (k) => {
       const dr = 20, dg = 66, db = 38, lr = 132, lg = 214, lb = 148;
       return "rgb(" + Math.round(dr + (lr - dr) * k) + "," + Math.round(dg + (lg - dg) * k) + "," + Math.round(db + (lb - db) * k) + ")";
     };
+    const strandCol = (depth, tint) => {
+      const l = (0.72 + 0.34 * Math.max(0, depth)) * (1 + tint);
+      return "rgb(" + Math.round(128 * l) + "," + Math.round(119 * l) + "," + Math.round(105 * l) + ")";
+    };
 
+    /* ---- Mayan carved stone bowl ---- */
     const drawPot = () => {
-      const rx = unit * 0.105, ry = unit * 0.019, ph = unit * 0.055;
-      const grad = ctx.createLinearGradient(baseX - rx, 0, baseX + rx, 0);
-      grad.addColorStop(0, "#55514A"); grad.addColorStop(0.32, "#8B867B"); grad.addColorStop(0.6, "#7A756C"); grad.addColorStop(1, "#4A463F");
+      const rx = unit * 0.13, tier = unit * 0.014, bandH = unit * 0.03, lowH = unit * 0.028;
+      const x0 = baseX - rx, topY = baseY;
+      // rim slab
+      let grad = ctx.createLinearGradient(x0, 0, baseX + rx, 0);
+      grad.addColorStop(0, "#6E675B"); grad.addColorStop(0.35, "#A79E8C"); grad.addColorStop(0.7, "#948B7A"); grad.addColorStop(1, "#5C564B");
+      ctx.fillStyle = grad;
+      ctx.fillRect(x0, topY, rx * 2, tier);
+      // glyph band (slightly inset)
+      const bx = baseX - rx * 0.94, bw = rx * 1.88, by = topY + tier;
+      grad = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+      grad.addColorStop(0, "#645D51"); grad.addColorStop(0.4, "#9C937F"); grad.addColorStop(1, "#544E43");
+      ctx.fillStyle = grad;
+      ctx.fillRect(bx, by, bw, bandH);
+      // step-fret (greca) carving across the band
+      ctx.strokeStyle = "rgba(38,33,26,.75)"; ctx.lineWidth = 1.6; ctx.lineJoin = "miter"; ctx.lineCap = "butt";
+      const cell = bandH * 1.15;
+      for (let cx0 = bx + 4; cx0 < bx + bw - cell; cx0 += cell) {
+        const p = cell, yTop = by + bandH * 0.2, yMid = by + bandH * 0.52, yBot = by + bandH * 0.82;
+        ctx.beginPath();
+        ctx.moveTo(cx0, yBot); ctx.lineTo(cx0, yTop); ctx.lineTo(cx0 + p * 0.62, yTop);
+        ctx.lineTo(cx0 + p * 0.62, yMid); ctx.lineTo(cx0 + p * 0.28, yMid); ctx.lineTo(cx0 + p * 0.28, yBot * 0.994);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(38,33,26,.55)";
+        ctx.fillRect(cx0 + p * 0.75, yMid, p * 0.14, p * 0.14);
+      }
+      // carved highlight under rim
+      ctx.strokeStyle = "rgba(235,228,210,.28)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(bx, by + 0.5); ctx.lineTo(bx + bw, by + 0.5); ctx.stroke();
+      // lower taper + plinth
+      const ly = by + bandH;
+      grad = ctx.createLinearGradient(baseX - rx * 0.9, 0, baseX + rx * 0.9, 0);
+      grad.addColorStop(0, "#57513F"); grad.addColorStop(0.4, "#8B8272"); grad.addColorStop(1, "#4B463C");
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.moveTo(baseX - rx, baseY);
-      ctx.bezierCurveTo(baseX - rx * 0.95, baseY + ph * 0.85, baseX - rx * 0.6, baseY + ph, baseX - rx * 0.5, baseY + ph);
-      ctx.lineTo(baseX + rx * 0.5, baseY + ph);
-      ctx.bezierCurveTo(baseX + rx * 0.6, baseY + ph, baseX + rx * 0.95, baseY + ph * 0.85, baseX + rx, baseY);
+      ctx.moveTo(baseX - rx * 0.9, ly); ctx.lineTo(baseX + rx * 0.9, ly);
+      ctx.lineTo(baseX + rx * 0.7, ly + lowH); ctx.lineTo(baseX - rx * 0.7, ly + lowH);
       ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "#3C3933";
-      for (const fx of [-0.34, 0, 0.34]) { ctx.beginPath(); ctx.ellipse(baseX + rx * fx, baseY + ph + 3, unit * 0.013, unit * 0.006, 0, 0, 6.283); ctx.fill(); }
-      ctx.fillStyle = "#8F8A7E"; ctx.beginPath(); ctx.ellipse(baseX, baseY, rx, ry, 0, 0, 6.283); ctx.fill();
-      ctx.fillStyle = "#221B13"; ctx.beginPath(); ctx.ellipse(baseX, baseY, rx * 0.87, ry * 0.8, 0, 0, 6.283); ctx.fill();
-      ctx.strokeStyle = "rgba(238,233,220,.32)"; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.ellipse(baseX, baseY, rx, ry, 0, 3.4, 6.0); ctx.stroke();
+      ctx.fillStyle = "#4E483E";
+      ctx.fillRect(baseX - rx * 0.8, ly + lowH, rx * 1.6, tier);
+      // weathering cracks
+      ctx.strokeStyle = "rgba(30,26,20,.5)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x0 + rx * 0.3, topY + 2); ctx.lineTo(x0 + rx * 0.36, by + bandH * 0.7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(baseX + rx * 0.55, by + 3); ctx.lineTo(baseX + rx * 0.48, ly + lowH * 0.6); ctx.stroke();
+      // soil
+      ctx.fillStyle = "#221B13";
+      ctx.beginPath(); ctx.ellipse(baseX, topY + 1, rx * 0.9, tier * 0.55, 0, 0, 6.283); ctx.fill();
       ctx.fillStyle = "rgba(70,190,121,.3)";
-      for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc(baseX + Math.sin(i * 2.1) * rx * 0.62, baseY + Math.cos(i * 1.7) * ry * 0.4, 1.2, 0, 6.283); ctx.fill(); }
+      for (let i = 0; i < 10; i++) { ctx.beginPath(); ctx.arc(baseX + Math.sin(i * 2.1) * rx * 0.66, topY + Math.cos(i * 1.7) * tier * 0.3, 1.2, 0, 6.283); ctx.fill(); }
     };
 
-    /* bark with striations + edge shading, growth sparks at live tips */
-    const drawBranches = (g) => {
+    /* ---- braided trunk: strands weave over and under the spine ---- */
+    const drawTrunk = (g) => {
+      const S = tree.spine;
+      let M = 0;
+      while (M < S.length - 1 && S[M + 1].g <= g) M++;
+      if (M < 1) return;
       ctx.lineCap = "round";
-      for (const b of tree.branches) {
-        const t = (g - b.g0) / (b.g1 - b.g0);
-        if (t <= 0) continue;
-        const e = sm(Math.min(1, t));
-        const n = Math.max(1, Math.round(e * (b.pts.length - 1)));
-        for (let k = 0; k < n; k++) {
-          const fr = k / (b.pts.length - 1);
-          const w = Math.max(0.9, b.w0 + (b.w1 - b.w0) * fr);
-          const x0 = b.pts[k][0], y0 = b.pts[k][1], x1 = b.pts[k + 1][0], y1 = b.pts[k + 1][1];
-          ctx.strokeStyle = "rgba(30,25,18,.55)"; ctx.lineWidth = w;
-          ctx.beginPath(); ctx.moveTo(x0 + w * 0.2, y0 + 0.4); ctx.lineTo(x1 + w * 0.2, y1 + 0.4); ctx.stroke();
-          ctx.strokeStyle = bark(b.z, b.tint); ctx.lineWidth = w;
-          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-          if (w > 3.2) {
-            // vertical striations: two thin darker grain lines within the width
-            const o1 = Math.sin(b.sd + k * 1.7) * w * 0.22, o2 = Math.sin(b.sd * 1.3 + k * 2.3) * w * 0.3;
-            ctx.strokeStyle = "rgba(52,45,36,.4)"; ctx.lineWidth = Math.max(0.5, w * 0.1);
-            ctx.beginPath(); ctx.moveTo(x0 + o1, y0); ctx.lineTo(x1 + o1, y1); ctx.stroke();
-            ctx.strokeStyle = "rgba(40,34,27,.3)"; ctx.lineWidth = Math.max(0.4, w * 0.08);
-            ctx.beginPath(); ctx.moveTo(x0 + o2, y0); ctx.lineTo(x1 + o2, y1); ctx.stroke();
+      for (const pass of [-1, 1]) {
+        for (const st of tree.strands) {
+          for (let j = 0; j < M; j++) {
+            const s0 = S[j], s1 = S[j + 1];
+            const th0 = s0.u * st.freq * 6.283 + st.phase;
+            const depth = Math.cos(th0 + 3.14 * 0.5 * 0); // depth of this crossing
+            if ((pass < 0 && Math.cos(th0) >= 0) || (pass > 0 && Math.cos(th0) < 0)) continue;
+            // root flare: strands splay wide near the base
+            const flare0 = 1 + Math.max(0, 1 - s0.u * 7) * 1.1;
+            const flare1 = 1 + Math.max(0, 1 - s1.u * 7) * 1.1;
+            const amp0 = s0.w * 0.55 * flare0, amp1 = s1.w * 0.55 * flare1;
+            const th1 = s1.u * st.freq * 6.283 + st.phase;
+            const o0 = Math.sin(th0) * amp0, o1 = Math.sin(th1) * amp1;
+            const d0 = Math.cos(th0);
+            const w = Math.max(1, (s0.w * st.wf) * (0.82 + 0.22 * Math.max(0, d0)));
+            // dark contact shadow beneath each strand
+            ctx.strokeStyle = "rgba(26,21,15,.5)"; ctx.lineWidth = w + 1.6;
+            ctx.beginPath(); ctx.moveTo(s0.x + s0.nx * o0 + 0.8, s0.y + s0.ny * o0 + 1); ctx.lineTo(s1.x + s1.nx * o1 + 0.8, s1.y + s1.ny * o1 + 1); ctx.stroke();
+            ctx.strokeStyle = strandCol(d0, st.tint); ctx.lineWidth = w;
+            ctx.beginPath(); ctx.moveTo(s0.x + s0.nx * o0, s0.y + s0.ny * o0); ctx.lineTo(s1.x + s1.nx * o1, s1.y + s1.ny * o1); ctx.stroke();
+            // light catch on front strands
+            if (d0 > 0.25) {
+              ctx.strokeStyle = "rgba(226,214,190,.24)"; ctx.lineWidth = Math.max(0.5, w * 0.3);
+              ctx.beginPath(); ctx.moveTo(s0.x + s0.nx * o0 - w * 0.24, s0.y + s0.ny * o0 - 0.4); ctx.lineTo(s1.x + s1.nx * o1 - w * 0.24, s1.y + s1.ny * o1 - 0.4); ctx.stroke();
+            }
           }
-          ctx.strokeStyle = "rgba(226,214,192,.20)"; ctx.lineWidth = Math.max(0.5, w * 0.26);
-          ctx.beginPath(); ctx.moveTo(x0 - w * 0.26, y0 - 0.3); ctx.lineTo(x1 - w * 0.26, y1 - 0.3); ctx.stroke();
-        }
-        // growth sparks at the extending tip
-        if (!reduced && e < 1 && rnd() < 0.5 && sparks.length < 90) {
-          const tip = b.pts[n];
-          sparks.push({ x: tip[0], y: tip[1], vx: J(-0.4, 0.4), vy: J(-0.9, -0.2), life: 1, s: J(1, 2.4) });
         }
       }
-      // knots at trunk joints
-      for (const kn of tree.knots) {
-        if (g < kn.g) continue;
-        ctx.fillStyle = "rgba(58,50,40,.75)";
-        ctx.beginPath(); ctx.ellipse(kn.x, kn.y, kn.r, kn.r * 0.7, 0.4, 0, 6.283); ctx.fill();
-        ctx.strokeStyle = "rgba(30,25,18,.5)"; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.ellipse(kn.x, kn.y, kn.r * 1.25, kn.r * 0.9, 0.4, 0, 6.283); ctx.stroke();
+      // growth sparks at the braid's rising tip
+      if (!reduced && S[M].g < 0.98 && g < S[S.length - 1].g && rnd() < 0.6 && sparks.length < 90) {
+        sparks.push({ x: S[M].x + J(-4, 4), y: S[M].y, vx: J(-0.4, 0.4), vy: J(-0.9, -0.2), life: 1, s: J(1, 2.4) });
       }
     };
 
-    /* foliage: per-leaf while growing, cached canvas once complete */
+    /* smooth tapered limbs: layered sub-paths, no segment blobs */
+    const drawLimb = (b, g) => {
+      const t = (g - b.g0) / (b.g1 - b.g0);
+      if (t <= 0) return false;
+      const e = sm(Math.min(1, t));
+      const n = b.pts.length - 1;
+      const m = Math.max(1, Math.round(e * n));
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      // shadow underlay
+      ctx.strokeStyle = "rgba(26,21,15,.45)"; ctx.lineWidth = b.w0 * 0.9;
+      ctx.beginPath(); ctx.moveTo(b.pts[0][0] + 1, b.pts[0][1] + 1.2);
+      for (let j = 1; j <= Math.max(1, Math.round(m * 0.6)); j++) ctx.lineTo(b.pts[j][0] + 1, b.pts[j][1] + 1.2);
+      ctx.stroke();
+      const L = 5;
+      const col = strandCol(0.4, b.tint);
+      for (let k = 0; k < L; k++) {
+        const end = Math.max(1, Math.round(m * (1 - k / L * 0.85)));
+        ctx.strokeStyle = col;
+        ctx.lineWidth = Math.max(0.7, b.w1 + (b.w0 - b.w1) * ((k + 1) / L));
+        ctx.beginPath(); ctx.moveTo(b.pts[0][0], b.pts[0][1]);
+        for (let j = 1; j <= end; j++) ctx.lineTo(b.pts[j][0], b.pts[j][1]);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = "rgba(226,214,190,.18)"; ctx.lineWidth = Math.max(0.5, b.w0 * 0.22);
+      ctx.beginPath(); ctx.moveTo(b.pts[0][0] - b.w0 * 0.2, b.pts[0][1] - 0.5);
+      for (let j = 1; j <= m; j++) ctx.lineTo(b.pts[j][0] - b.w0 * 0.2, b.pts[j][1] - 0.5);
+      ctx.stroke();
+      if (!reduced && e < 1 && rnd() < 0.4 && sparks.length < 90) {
+        const tip = b.pts[m];
+        sparks.push({ x: tip[0], y: tip[1], vx: J(-0.4, 0.4), vy: J(-0.9, -0.2), life: 1, s: J(1, 2.2) });
+      }
+      return true;
+    };
+
     const padCache = (p) => {
       const padPx = 8;
       const cw = Math.ceil(p.rx * 2 + padPx * 2), ch = Math.ceil(p.ry * 2 + padPx * 2 + p.ry);
@@ -2471,6 +2546,8 @@ function GreenBG() {
       const cx = cw / 2, cy = p.ry + padPx;
       c.fillStyle = "rgba(8,24,14,.5)";
       c.beginPath(); c.ellipse(cx, cy + p.ry * 0.35, p.rx * 1.02, p.ry * 0.95, 0, 0, 6.283); c.fill();
+      c.strokeStyle = "rgba(70,60,48,.6)"; c.lineWidth = 1.1; c.lineCap = "round";
+      for (const tw of p.twigs) { c.beginPath(); c.moveTo(cx, cy + p.ry * 0.2); c.lineTo(cx + tw.x2, cy + tw.y2); c.stroke(); }
       for (const l of p.leaves) {
         c.fillStyle = leafCol(l.k);
         c.beginPath(); c.ellipse(cx + l.dx, cy + l.dy, l.s, l.s * 0.5, l.rot, 0, 6.283); c.fill();
@@ -2487,13 +2564,14 @@ function GreenBG() {
           p.popped = true;
           for (let i = 0; i < 7 && sparks.length < 90; i++) sparks.push({ x: p.x + J(-p.rx, p.rx) * 0.5, y: p.y, vx: J(-0.6, 0.6), vy: J(-1, -0.3), life: 1, s: J(1, 2.6) });
         }
-        const fullyGrown = g > p.g0 + 0.19;
-        if (fullyGrown) {
+        if (g > p.g0 + 0.19) {
           if (!p.cv) padCache(p);
           ctx.drawImage(p.cv, 0, 0, p.cv.width, p.cv.height, p.x - p.cw / 2 + sw, p.y - (p.ry + 8), p.cw, p.ch);
         } else {
           ctx.fillStyle = "rgba(8,24,14," + (0.5 * e).toFixed(3) + ")";
           ctx.beginPath(); ctx.ellipse(p.x + sw, p.y + p.ry * 0.35, p.rx * 1.02 * e, p.ry * 0.95 * e, 0, 0, 6.283); ctx.fill();
+          ctx.strokeStyle = "rgba(70,60,48,.6)"; ctx.lineWidth = 1.1;
+          for (const tw of p.twigs) { ctx.beginPath(); ctx.moveTo(p.x + sw, p.y + p.ry * 0.2); ctx.lineTo(p.x + tw.x2 * e + sw, p.y + tw.y2 * e); ctx.stroke(); }
           for (const l of p.leaves) {
             if (g < l.g) continue;
             const ls = l.s * sm(Math.min(1, (g - l.g) / 0.045));
@@ -2520,16 +2598,6 @@ function GreenBG() {
       g = reduced ? target : g + (target - g) * 0.06;
 
       drawPot();
-      const rg = sm(Math.min(1, g / 0.07));
-      if (rg > 0.02) {
-        ctx.lineCap = "round";
-        for (const r of tree.roots) {
-          ctx.strokeStyle = "#6E6255"; ctx.lineWidth = r.w * rg;
-          ctx.beginPath(); ctx.moveTo(r.x0, r.y0);
-          ctx.quadraticCurveTo(r.x0 + (r.x1 - r.x0) * 0.4, r.y0 + (r.y1 - r.y0) * 0.9, r.x0 + (r.x1 - r.x0) * rg, r.y0 + (r.y1 - r.y0) * rg);
-          ctx.stroke();
-        }
-      }
       const gg = Math.min(1, g / 0.1);
       if (gg > 0.01) {
         ctx.strokeStyle = "rgba(70,190,121,.45)"; ctx.lineWidth = 1.2;
@@ -2553,9 +2621,20 @@ function GreenBG() {
         ctx.restore();
       }
       drawPads(tree.pads.filter(p => p.z < 0), g, time);
-      drawBranches(g);
+      drawTrunk(g);
+      for (const b of tree.branches) drawLimb(b, g);
+      // aerial roots drop late, swaying gently
+      for (const hgt of tree.hangs) {
+        const t = (g - hgt.g0) / 0.15;
+        if (t <= 0) continue;
+        const e = sm(Math.min(1, t));
+        const sway = reduced ? 0 : Math.sin(time * 0.8 + hgt.ph) * 2;
+        ctx.strokeStyle = "rgba(150,138,120,.8)"; ctx.lineWidth = 1.6; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(hgt.x, hgt.y);
+        ctx.quadraticCurveTo(hgt.x + hgt.dx * 0.6 + sway, hgt.y + (baseY - hgt.y) * 0.6 * e, hgt.x + hgt.dx + sway, hgt.y + (baseY - hgt.y) * e);
+        ctx.stroke();
+      }
       drawPads(tree.pads.filter(p => p.z >= 0), g, time);
-      // growth sparks
       ctx.globalCompositeOperation = "lighter";
       for (let i = sparks.length - 1; i >= 0; i--) {
         const s = sparks[i];
