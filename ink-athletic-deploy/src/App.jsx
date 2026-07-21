@@ -1589,12 +1589,15 @@ function ProcessCard({ s, i, open, total }) {
   // Measure the card and its text block, then scatter large glyphs anywhere
   // on the card EXCEPT a 10px halo around the number + paragraph, with no
   // glyph-on-glyph overlap. Re-runs on resize.
+  const placedRef = useRef(false);
   useEffect(() => {
     const place = () => {
       const card = cardRef.current, txt = txtRef.current, num = numRef.current;
-      if (!card || !txt || !num) return;
+      if (!card || !txt || !num) return false;
       const cr = card.getBoundingClientRect();
-      if (cr.width < 60 || cr.height < 60) return;
+      // content-visibility:auto keeps off-screen sections unmeasured (0-size);
+      // placement must wait until the card is actually rendered.
+      if (cr.width < 60 || cr.height < 60) return false;
       const tr = txt.getBoundingClientRect(), nr = num.getBoundingClientRect();
       const ex = {
         l: Math.min(tr.left, nr.left) - cr.left - 10,
@@ -1625,13 +1628,19 @@ function ProcessCard({ s, i, open, total }) {
         });
       }
       setMarks(placed);
+      placedRef.current = true;
+      return true;
     };
-    place();
-    let t = 0;
-    const onR = () => { clearTimeout(t); t = setTimeout(place, 250); };
+    let t = 0, tries = 0;
+    const attempt = () => {
+      if (placedRef.current) return;
+      if (!place() && tries++ < 8) t = setTimeout(attempt, 250);
+    };
+    if (open || !placedRef.current) attempt();
+    const onR = () => { clearTimeout(t); placedRef.current = false; tries = 0; t = setTimeout(attempt, 250); };
     addEventListener("resize", onR);
     return () => { removeEventListener("resize", onR); clearTimeout(t); };
-  }, []);
+  }, [open]);
   return (
     <div className="scardwrap">
       <div ref={cardRef} className={"scard" + (open ? " sopen" : "")} style={{ transitionDelay: delay + "s" }}>
