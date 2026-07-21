@@ -13,7 +13,7 @@ import { DEFAULT_PRODUCTS, CATEGORIES } from "./catalog.js";
 const ART_TYPES = ["kiosk", "qr", "printer", "laser", "ai"];
 
 const WHY = [
-  { t: "Indigenous Owned", d: "Proudly Indigenous owned and operated, out of British Columbia.", icon: "leaf" },
+  { t: "Locally Rooted", d: "Independently owned and operated out of Northern British Columbia.", icon: "leaf" },
   { t: "AI Powered", d: "Intelligence built into every product we ship.", icon: "chip" },
   { t: "Custom Built", d: "Specced around your business, not a template.", icon: "wrench" },
   { t: "Secure Solutions", d: "Local-first options keep your data yours.", icon: "shield" },
@@ -33,12 +33,12 @@ const SITE_DEFAULTS = {
   titleLine: "Ink Athletic Ltd. — AI Solutions & Interactive Kiosks",
   heroH1a: "AI Engineered", heroH1b: "Products.",
   heroSub1: "That work for you. ",
-  heroStrong: "Indigenous owned and operated",
+  heroStrong: "Engineered in Northern BC",
   heroSub2: " — kiosks and AI systems built for businesses that want to feel like the future.",
   hint: "Scroll to break the orb",
   caps: [
     { k: "00 / Mission", h: "Built for outcomes.", p: "AI engineered products, designed to work for your business — not the other way around." },
-    { k: "01 / Ownership", h: "Proudly Indigenous.", p: "Ink Athletic Ltd. is Indigenous owned and operated — engineering our own path forward." },
+    { k: "01 / Ownership", h: "Independently built.", p: "Ink Athletic Ltd. is founder-led and independently owned — engineering our own path forward." },
     { k: "02 / Craft", h: "Precision, inside and out.", p: "Every system we ship is built to a standard: hardware that lasts, software that works quietly in the background." }
   ],
   whyEyebrow: "Why Ink Athletic", whyTitle: "Built different",
@@ -56,7 +56,7 @@ const SITE_DEFAULTS = {
   footerBlurb: "Kiosks and custom AI, built for real-world businesses.",
   address: "9711 100th Ave, Unit 208 (upstairs)",
   city: "Fort St. John, British Columbia", postal: "V1J 1Y2", country: "Canada",
-  bottomLine: "Indigenous owned and operated",
+  bottomLine: "Built in the North. Engineered for the future.",
   socials: {
     facebook: "https://facebook.com/inkathletic",
     instagram: "https://instagram.com/inkathletic",
