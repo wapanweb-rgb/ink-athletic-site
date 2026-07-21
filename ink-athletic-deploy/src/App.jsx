@@ -2674,8 +2674,8 @@ const ECO_POINTS = [
     d: "We build with premium components rated for years of all-day public use, and we keep supporting what we ship. A longer service life means fewer replacements — and less electronic waste."
   },
   {
-    t: "Close to home",
-    d: "Designed, built, and installed from Fort St. John, BC. We source locally where we can, ship within Canada only, and show up in person — shorter distances at every step."
+    t: "Rooted in this land",
+    d: "Ink Athletic is proudly Indigenous-owned. Founder Brandon Cameron is a member of Saulteau First Nations, raised by his grandmother and his father, who taught him the Indigenous ways of working with the land — take only what you need, tend what you have, and leave things better than you found them. That teaching runs through everything we build: technology made with respect for its place, built to last, close to home in Northern BC."
   }
 ];
 
