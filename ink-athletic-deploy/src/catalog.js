@@ -3,6 +3,9 @@
 // server prices orders from the same source of truth the site displays, so a
 // tampered browser can't change what a customer is charged.
 
+// Store categories — shown as filter pills above the product carousel.
+export const CATEGORIES = ["Software & Hardware", "Kiosks", "3D Prints", "Websites"];
+
 export const DEFAULT_PRODUCTS = [
   {
     id: "ai-kiosk",
@@ -11,7 +14,8 @@ export const DEFAULT_PRODUCTS = [
     line: "A voice-and-touch AI concierge that answers, books, and greets — all day, every day.",
     price: 2499,
     features: ["AI assistant", "Touchscreen", "Voice interaction", "NFC", "QR codes", "Live weather", "Business info"],
-    art: "kiosk", image: null
+    art: "kiosk", image: null,
+    category: "Kiosks"
   },
   {
     id: "qr-kiosk",
@@ -21,6 +25,7 @@ export const DEFAULT_PRODUCTS = [
     price: 899,
     features: ["Multiple QR codes", "NFC", "Weather", "Contact info", "Scrolling announcements"],
     art: "qr", image: null,
+    category: "Kiosks",
     addOns: [{ name: "Laser-engraved logo — wood front plate", price: 90 }]
   },
   {
@@ -30,6 +35,7 @@ export const DEFAULT_PRODUCTS = [
     line: "Local AI, automation, and knowledge bases wired into the tools you already use.",
     price: 1500,
     features: ["Local AI", "Business automation", "Knowledge bases", "Custom software", "AI integrations"],
-    art: "ai", image: null
+    art: "ai", image: null,
+    category: "Software & Hardware"
   }
 ];
