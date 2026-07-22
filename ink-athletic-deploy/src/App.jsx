@@ -346,35 +346,51 @@ function startOrbEngine(canvas, refs, cinemaEl) {
   const CODE_TEX=(()=>{
     const c=document.createElement("canvas");c.width=256;c.height=512;
     const g=c.getContext("2d");
-    const chars="01<>{}[]/=+*#&$%!?;:~^ABCDEF0123456789";
-    g.font="8px 'JetBrains Mono',monospace";g.textBaseline="top";
-    // dense base field — hundreds of dim characters
-    for(let col=0;col<26;col++){
-      const x=3+col*9.8;
-      const colDim=0.5+Math.random()*0.5; // whole columns vary in strength
-      for(let row=0;row<56;row++){
-        if(Math.random()<0.18)continue;
-        const y=2+row*9.1;
-        g.fillStyle=`rgba(255,68,82,${(colDim*(0.08+Math.random()*0.3)).toFixed(3)})`;
-        g.fillText(chars[(Math.random()*chars.length)|0],x,y);
+    // real code, large enough to read, tight line spacing
+    const LINES=[
+      "const orb = new Engine({",
+      "  faces: 60, mode:'ink'",
+      "});",
+      "function ignite(t) {",
+      "  const p = phase(t);",
+      "  return p * 0.618;",
+      "}",
+      "if (core.online) {",
+      "  mesh.rotate(dt);",
+      "  emit('pulse', p);",
+      "}",
+      "for(let i=0;i<n;i++){",
+      "  shards[i].update(t);",
+      "}",
+      "await forge.load();",
+      "export default Ink;",
+      "let heat = 0xFF4650;",
+      "sys.boot('athletic');",
+      "return mirror.sync();",
+      "class Shard extends T",
+      "render(ctx, uv) {",
+      "  this.glow += dt;",
+      "node.link(a, b, 42);",
+      "// engineered north",
+      "watch(()=> reforge())",
+      "db.push({id, price});",
+      "camera.orbit(0.22);",
+      "light.cast('north');",
+    ];
+    g.font="12px 'JetBrains Mono',monospace";g.textBaseline="top";
+    let y=3, li=(Math.random()*LINES.length)|0;
+    while(y<500){
+      const ln=LINES[li%LINES.length]; li+=1+((Math.random()*3)|0);
+      const bright=Math.random()<0.18;
+      if(bright){g.save();g.shadowColor="rgba(255,68,82,0.9)";g.shadowBlur=6;
+        g.fillStyle="rgba(255,178,186,0.95)";g.fillText(ln,6,y);g.restore();}
+      else{g.fillStyle=`rgba(255,88,100,${(0.5+Math.random()*0.3).toFixed(2)})`;
+        g.fillText(ln,6,y);}
+      if(Math.random()<0.12){
+        g.fillStyle="rgba(255,220,224,0.9)";
+        g.fillRect(6+g.measureText(ln).width+3,y+1,7,11);
       }
-    }
-    // matrix rain: bright falling streams with white-hot heads
-    for(let d=0;d<10;d++){
-      const x=3+((Math.random()*26)|0)*9.8;
-      const headRow=(Math.random()*56)|0;
-      const len=6+(Math.random()*10)|0;
-      for(let k=0;k<len;k++){
-        const row=((headRow-k)%56+56)%56;
-        const y=2+row*9.1;
-        const fade=1-k/len;
-        if(k===0){g.save();g.shadowColor="rgba(255,120,130,0.95)";g.shadowBlur=8;
-          g.fillStyle="rgba(255,226,230,0.98)";
-          g.fillText(chars[(Math.random()*chars.length)|0],x,y);g.restore();}
-        else{g.save();g.shadowColor="rgba(255,68,82,0.8)";g.shadowBlur=4*fade;
-          g.fillStyle=`rgba(255,${Math.round(80+90*fade)},${Math.round(90+80*fade)},${(0.35+0.6*fade).toFixed(3)})`;
-          g.fillText(chars[(Math.random()*chars.length)|0],x,y);g.restore();}
-      }
+      y+=15;
     }
     return c;
   })();
@@ -619,18 +635,33 @@ function startOrbEngine(canvas, refs, cinemaEl) {
     }
     ctx.closePath();ctx.stroke();
     ctx.restore();
-    const gears=[
-      {x:0,y:0,R:86,teeth:26,tooth:9,hub:16,spd:0.22,w:1},
-      {x:-58,y:-46,R:44,teeth:14,tooth:7,hub:9,spd:-0.41,w:0.92},
-      {x:62,y:-38,R:36,teeth:11,tooth:6.5,hub:8,spd:-0.53,w:0.88},
-      {x:34,y:66,R:30,teeth:9,tooth:6,hub:7,spd:0.64,w:0.85}
-    ];
-    for(const gr of gears){
+    // ---- Leonardo clockwork: one fixed upper-left light source; every part
+    // casts a shadow, has machined thickness, and moves with purpose ----
+    function drawGear(gr,rot){
       ctx.save();
       ctx.translate(gr.x,gr.y);
+      // cast shadow onto the plate (light from upper-left)
       ctx.save();
-      ctx.rotate(time*gr.spd+(gr.x+gr.y));
-      // chrome body: high-contrast platinum sweep with a soft white halo
+      ctx.rotate(rot);
+      ctx.shadowColor="rgba(0,0,0,0.6)";ctx.shadowBlur=13;
+      ctx.shadowOffsetX=5;ctx.shadowOffsetY=7;
+      ctx.fillStyle="rgba(8,8,10,0.85)";
+      gearPath(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
+      ctx.fill("evenodd");
+      ctx.restore();
+      // extruded side wall — the wheel has thickness
+      ctx.save();
+      ctx.translate(2.4,3.2);ctx.rotate(rot);
+      const side=ctx.createLinearGradient(-gr.R,-gr.R,gr.R,gr.R);
+      side.addColorStop(0,`rgba(96,100,110,${0.95*gr.w})`);
+      side.addColorStop(1,`rgba(26,27,32,${0.95*gr.w})`);
+      ctx.fillStyle=side;
+      gearPath(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
+      ctx.fill("evenodd");
+      ctx.restore();
+      // chrome top face
+      ctx.save();
+      ctx.rotate(rot);
       const met=ctx.createRadialGradient(-gr.R*0.38,-gr.R*0.38,gr.R*0.05,0,0,gr.R*1.02);
       met.addColorStop(0,`rgba(255,255,255,${0.98*gr.w})`);
       met.addColorStop(0.22,`rgba(228,232,239,${0.96*gr.w})`);
@@ -638,22 +669,67 @@ function startOrbEngine(canvas, refs, cinemaEl) {
       met.addColorStop(0.74,`rgba(112,116,127,${0.92*gr.w})`);
       met.addColorStop(1,`rgba(58,61,70,${0.92*gr.w})`);
       ctx.fillStyle=met;
-      ctx.shadowColor="rgba(255,255,255,0.28)";ctx.shadowBlur=7;
       gearPath(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
       ctx.fill("evenodd");
-      ctx.shadowColor="rgba(255,68,82,0.5)";ctx.shadowBlur=10;
-      ctx.strokeStyle="rgba(30,31,36,0.9)";ctx.lineWidth=1.4;ctx.stroke();
-      ctx.shadowBlur=0;
-      // spokes: dark base under a chrome light pass
-      for(let k=0;k<4;k++){
-        const a=k*Math.PI/2;
-        ctx.strokeStyle="rgba(40,42,48,0.9)";ctx.lineWidth=6;
-        ctx.beginPath();ctx.moveTo(Math.cos(a)*gr.hub,Math.sin(a)*gr.hub);
-        ctx.lineTo(Math.cos(a)*(gr.R-gr.tooth-3),Math.sin(a)*(gr.R-gr.tooth-3));ctx.stroke();
-        ctx.strokeStyle="rgba(226,230,238,0.85)";ctx.lineWidth=2.6;
-        ctx.beginPath();ctx.moveTo(Math.cos(a)*gr.hub,Math.sin(a)*gr.hub);
-        ctx.lineTo(Math.cos(a)*(gr.R-gr.tooth-3),Math.sin(a)*(gr.R-gr.tooth-3));ctx.stroke();
+      // tooth bevels: lit flank / shaded flank
+      ctx.save();ctx.translate(-0.8,-0.8);
+      gearPath(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
+      ctx.strokeStyle=`rgba(255,255,255,${0.35*gr.w})`;ctx.lineWidth=1;ctx.stroke();ctx.restore();
+      ctx.save();ctx.translate(0.8,0.8);
+      gearPath(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
+      ctx.strokeStyle="rgba(10,11,14,0.55)";ctx.lineWidth=1;ctx.stroke();ctx.restore();
+      const r1=gr.R-gr.tooth-4,r0=gr.hub+7;
+      if(gr.R>=28&&r1-r0>10){
+        // carved spoke windows — four annular cutouts with beveled edges
+        for(let k=0;k<4;k++){
+          const a0=k*1.5708+0.28,a1=(k+1)*1.5708-0.28;
+          const win=()=>{ctx.beginPath();ctx.arc(0,0,r1-3,a0,a1);
+            ctx.arc(0,0,r0+3,a1,a0,true);ctx.closePath();};
+          win();ctx.fillStyle="rgba(13,13,16,0.92)";ctx.fill();
+          win();ctx.strokeStyle="rgba(0,0,0,0.55)";ctx.lineWidth=1.6;ctx.stroke();
+          ctx.save();ctx.translate(-0.7,-0.7);win();
+          ctx.strokeStyle="rgba(255,255,255,0.16)";ctx.lineWidth=0.9;ctx.stroke();ctx.restore();
+        }
+        // bolts on the four spokes, each with a screw slot
+        for(let k=0;k<4;k++){
+          const a=k*1.5708,rB=(r0+r1)/2;
+          const bx=Math.cos(a)*rB,by=Math.sin(a)*rB;
+          ctx.fillStyle="rgba(52,54,62,0.95)";
+          ctx.beginPath();ctx.arc(bx,by,3,0,6.283);ctx.fill();
+          ctx.fillStyle="rgba(235,238,244,0.7)";
+          ctx.beginPath();ctx.arc(bx-0.9,by-0.9,1.1,0,6.283);ctx.fill();
+          ctx.strokeStyle="rgba(14,15,18,0.8)";ctx.lineWidth=0.9;
+          ctx.beginPath();ctx.moveTo(bx-2,by);ctx.lineTo(bx+2,by);ctx.stroke();
+        }
+        // engraved index ticks on the outer rim band
+        ctx.strokeStyle="rgba(16,17,20,0.5)";ctx.lineWidth=0.8;
+        for(let i=0;i<gr.teeth*2;i++){
+          const a=i/(gr.teeth*2)*6.283;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a)*(r1-1),Math.sin(a)*(r1-1));
+          ctx.lineTo(Math.cos(a)*(r1+2.5),Math.sin(a)*(r1+2.5));
+          ctx.stroke();
+        }
       }
+      // machined groove circles: dark cut + lit lip
+      for(const rr of [r1,r0]){
+        if(rr<=gr.hub+2)continue;
+        ctx.strokeStyle="rgba(16,17,21,0.75)";ctx.lineWidth=1.4;
+        ctx.beginPath();ctx.arc(0,0,rr,0,6.283);ctx.stroke();
+        ctx.strokeStyle="rgba(255,255,255,0.2)";ctx.lineWidth=0.7;
+        ctx.beginPath();ctx.arc(0,0,rr-1.1,0,6.283);ctx.stroke();
+      }
+      ctx.restore();
+      // fixed specular shimmer — stays put while the wheel spins beneath it,
+      // breathing slowly like light playing on chrome
+      const sa=-2.4+Math.sin(time*0.5+gr.x*0.11)*0.16;
+      ctx.save();
+      ctx.shadowColor="rgba(255,255,255,0.6)";ctx.shadowBlur=6;
+      ctx.strokeStyle=`rgba(255,255,255,${0.5*gr.w})`;ctx.lineWidth=2.6;ctx.lineCap="round";
+      ctx.beginPath();ctx.arc(0,0,gr.R*0.62,sa,sa+1.05);ctx.stroke();
+      ctx.strokeStyle=`rgba(255,255,255,${0.2*gr.w})`;ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.arc(0,0,gr.R*0.8,sa+2.9,sa+3.6);ctx.stroke();
+      ctx.restore();
       // platinum hub with a red jewel core
       const hubG=ctx.createRadialGradient(-2,-2,1,0,0,gr.hub*0.7);
       hubG.addColorStop(0,"rgba(250,252,255,0.95)");hubG.addColorStop(0.6,"rgba(180,185,196,0.95)");hubG.addColorStop(1,"rgba(90,94,104,0.95)");
@@ -661,15 +737,108 @@ function startOrbEngine(canvas, refs, cinemaEl) {
       ctx.save();ctx.shadowColor="rgba(255,68,82,0.9)";ctx.shadowBlur=8;
       ctx.fillStyle="#FF4650";ctx.beginPath();ctx.arc(0,0,gr.hub*0.26,0,6.283);ctx.fill();ctx.restore();
       ctx.restore();
-      // fixed specular arcs — they do NOT rotate with the gear, which is what
-      // makes the metal read as chrome under a steady light
+    }
+    const gears=[
+      {x:0,y:0,R:86,teeth:26,tooth:9,hub:16,spd:0.22,w:1},
+      {x:-58,y:-46,R:44,teeth:14,tooth:7,hub:9,spd:-0.41,w:0.92},
+      {x:62,y:-38,R:36,teeth:11,tooth:6.5,hub:8,spd:-0.53,w:0.88},
+      {x:34,y:66,R:30,teeth:9,tooth:6,hub:7,spd:0.64,w:0.85},
+      {x:-20,y:-92,R:18,teeth:8,tooth:4.5,hub:5,spd:0.98,w:0.8},
+      {x:98,y:26,R:16,teeth:7,tooth:4,hub:4.5,spd:-1.1,w:0.8}
+    ];
+    for(const gr of gears)drawGear(gr,time*gr.spd+(gr.x+gr.y));
+    // ---- escapement: sawtooth escape wheel + rocking pallet anchor ----
+    {
+      const ex=-96,ey=58,er=20;
+      const erot=time*0.5;
       ctx.save();
-      ctx.shadowColor="rgba(255,255,255,0.6)";ctx.shadowBlur=6;
-      ctx.strokeStyle=`rgba(255,255,255,${0.5*gr.w})`;ctx.lineWidth=2.6;ctx.lineCap="round";
-      ctx.beginPath();ctx.arc(0,0,gr.R*0.62,-2.4,-1.35);ctx.stroke();
-      ctx.strokeStyle=`rgba(255,255,255,${0.2*gr.w})`;ctx.lineWidth=1.2;
-      ctx.beginPath();ctx.arc(0,0,gr.R*0.8,0.5,1.2);ctx.stroke();
+      ctx.translate(ex,ey);
+      // wheel shadow + body
+      ctx.save();ctx.rotate(erot);
+      ctx.shadowColor="rgba(0,0,0,0.55)";ctx.shadowBlur=10;
+      ctx.shadowOffsetX=4;ctx.shadowOffsetY=5;
+      ctx.fillStyle="rgba(8,8,10,0.8)";
+      ctx.beginPath();
+      for(let i=0;i<12;i++){
+        const a=i/12*6.283,a2=a+0.30;
+        ctx.lineTo(Math.cos(a)*er,Math.sin(a)*er);
+        ctx.lineTo(Math.cos(a2)*(er-6),Math.sin(a2)*(er-6));
+      }
+      ctx.closePath();ctx.fill();
+      const eg=ctx.createRadialGradient(-6,-6,1,0,0,er);
+      eg.addColorStop(0,"rgba(252,253,255,0.95)");eg.addColorStop(0.5,"rgba(190,195,206,0.92)");eg.addColorStop(1,"rgba(84,88,98,0.92)");
+      ctx.fillStyle=eg;ctx.shadowColor="transparent";ctx.shadowBlur=0;ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;
+      ctx.beginPath();
+      for(let i=0;i<12;i++){
+        const a=i/12*6.283,a2=a+0.30;
+        ctx.lineTo(Math.cos(a)*er,Math.sin(a)*er);
+        ctx.lineTo(Math.cos(a2)*(er-6),Math.sin(a2)*(er-6));
+      }
+      ctx.closePath();ctx.fill();
+      ctx.strokeStyle="rgba(14,15,18,0.7)";ctx.lineWidth=1;ctx.stroke();
       ctx.restore();
+      // hub
+      ctx.fillStyle="rgba(60,63,72,0.95)";ctx.beginPath();ctx.arc(0,0,4.5,0,6.283);ctx.fill();
+      ctx.fillStyle="rgba(240,243,248,0.8)";ctx.beginPath();ctx.arc(-1.2,-1.2,1.4,0,6.283);ctx.fill();
+      // rocking anchor above the wheel, jewel pallets kissing the teeth
+      const rock=Math.sin(time*6)*0.13;
+      ctx.save();
+      ctx.translate(0,-er-14);
+      ctx.rotate(rock);
+      ctx.shadowColor="rgba(0,0,0,0.5)";ctx.shadowBlur=8;ctx.shadowOffsetX=3;ctx.shadowOffsetY=5;
+      ctx.strokeStyle="rgba(206,211,222,0.95)";ctx.lineWidth=4.4;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(-14,16);ctx.quadraticCurveTo(0,2,14,16);ctx.stroke();
+      ctx.shadowColor="transparent";
+      ctx.strokeStyle="rgba(255,255,255,0.5)";ctx.lineWidth=1.4;
+      ctx.beginPath();ctx.moveTo(-14,15);ctx.quadraticCurveTo(0,1,14,15);ctx.stroke();
+      // pallet jewels
+      for(const px of [-14,14]){
+        ctx.save();ctx.shadowColor="rgba(255,68,82,0.9)";ctx.shadowBlur=7;
+        ctx.fillStyle="#FF4650";ctx.beginPath();ctx.arc(px,16.5,2.4,0,6.283);ctx.fill();ctx.restore();
+      }
+      // stem and counterweight
+      ctx.strokeStyle="rgba(206,211,222,0.9)";ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(0,4);ctx.lineTo(0,-10);ctx.stroke();
+      const cwg=ctx.createRadialGradient(-1.5,-11.5,0.5,0,-10,5);
+      cwg.addColorStop(0,"rgba(255,255,255,0.95)");cwg.addColorStop(1,"rgba(96,100,110,0.95)");
+      ctx.fillStyle=cwg;ctx.beginPath();ctx.arc(0,-10,4.6,0,6.283);ctx.fill();
+      ctx.restore();
+      ctx.restore();
+    }
+    // ---- crank + connecting rod + piston sliding in a vertical rail ----
+    {
+      const gx=62,gy=-38,crankR=14,L=64,railX=118;
+      const ca=time*-0.53+(gx+gy);
+      const pinX=gx+Math.cos(ca)*crankR,pinY=gy+Math.sin(ca)*crankR;
+      const dx=railX-pinX;
+      const pistY=pinY+Math.sqrt(Math.max(16,L*L-dx*dx));
+      // rail groove
+      ctx.strokeStyle="rgba(12,13,16,0.9)";ctx.lineWidth=6;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(railX,-28);ctx.lineTo(railX,46);ctx.stroke();
+      ctx.strokeStyle="rgba(190,195,206,0.35)";ctx.lineWidth=1.4;
+      ctx.beginPath();ctx.moveTo(railX-2,-28);ctx.lineTo(railX-2,46);ctx.stroke();
+      // connecting rod (chrome, lit edge)
+      ctx.save();
+      ctx.shadowColor="rgba(0,0,0,0.5)";ctx.shadowBlur=7;ctx.shadowOffsetX=3;ctx.shadowOffsetY=4;
+      ctx.strokeStyle="rgba(210,215,226,0.95)";ctx.lineWidth=4.6;ctx.lineCap="round";
+      ctx.beginPath();ctx.moveTo(pinX,pinY);ctx.lineTo(railX,pistY);ctx.stroke();
+      ctx.shadowColor="transparent";
+      ctx.strokeStyle="rgba(255,255,255,0.55)";ctx.lineWidth=1.3;
+      ctx.beginPath();ctx.moveTo(pinX-0.8,pinY-0.8);ctx.lineTo(railX-0.8,pistY-0.8);ctx.stroke();
+      // piston block
+      const pg=ctx.createLinearGradient(railX-6,pistY-8,railX+6,pistY+8);
+      pg.addColorStop(0,"rgba(250,252,255,0.95)");pg.addColorStop(0.5,"rgba(176,181,192,0.95)");pg.addColorStop(1,"rgba(70,74,84,0.95)");
+      ctx.fillStyle=pg;
+      ctx.beginPath();
+      if(ctx.roundRect)ctx.roundRect(railX-5.5,pistY-8,11,16,2.5);
+      else ctx.rect(railX-5.5,pistY-8,11,16);
+      ctx.fill();
+      ctx.strokeStyle="rgba(16,17,20,0.7)";ctx.lineWidth=1;ctx.stroke();
+      // pins
+      for(const [qx,qy] of [[pinX,pinY],[railX,pistY]]){
+        ctx.fillStyle="rgba(40,42,48,0.95)";ctx.beginPath();ctx.arc(qx,qy,2.6,0,6.283);ctx.fill();
+        ctx.fillStyle="rgba(240,243,248,0.8)";ctx.beginPath();ctx.arc(qx-0.8,qy-0.8,1,0,6.283);ctx.fill();
+      }
       ctx.restore();
     }
     ctx.save();
@@ -762,15 +931,10 @@ function startOrbEngine(canvas, refs, cinemaEl) {
     // sweeps across it (per-face phase so the shards never sync)
     const tN=performance.now()*0.001, phx=(x0*0.013+y0*0.007)%6.283;
     ctx.beginPath();ctx.moveTo(128,46);ctx.lineTo(217,215);ctx.lineTo(39,215);ctx.closePath();ctx.clip();
-    const off=(tN*30+phx*40)%512;
-    ctx.globalAlpha=0.75;
+    const off=(tN*20+phx*40)%512;
+    ctx.globalAlpha=0.88;
     ctx.drawImage(CODE_TEX,0,off-512);
     ctx.drawImage(CODE_TEX,0,off);
-    // second code layer, faster and dimmer — parallax depth in the glass
-    const off2=(tN*58+phx*70)%512;
-    ctx.globalAlpha=0.32;
-    ctx.drawImage(CODE_TEX,-4,off2-512);
-    ctx.drawImage(CODE_TEX,-4,off2);
     ctx.globalCompositeOperation="lighter";
     ctx.globalAlpha=0.6;
     const sx=(((tN*52)+phx*90)%740)-500;
