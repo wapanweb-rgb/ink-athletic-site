@@ -23,7 +23,7 @@ const PROCESS = [
 
 const SITE_DEFAULTS = {
   titleLine: "Ink Athletic Ltd. — AI Solutions & Interactive Kiosks",
-  heroH1a: "AI Engineered", heroH1b: "Products.",
+  heroH1a: "Web Design &", heroH1b: "AI Engineering.",
   heroSub1: "That work for you. ",
   heroStrong: "Engineered in Northern BC",
   heroSub2: " — kiosks and AI systems built for businesses that want to feel like the future.",
