@@ -4110,7 +4110,14 @@ export default function App() {
       const p = await loadData("products", null);
       if (Array.isArray(p) && p.length) setProductsState(p);
       const s = await loadData("site", null);
-      if (s && typeof s === "object") setSiteState({ ...SITE_DEFAULTS, ...s });
+      if (s && typeof s === "object") {
+        // migrate the legacy saved hero headline to the new branding; any
+        // other value the user typed in Admin is respected as-is
+        if (s.heroH1a === "AI Engineered" && s.heroH1b === "Products.") {
+          delete s.heroH1a; delete s.heroH1b;
+        }
+        setSiteState({ ...SITE_DEFAULTS, ...s });
+      }
     })();
   }, []);
 
