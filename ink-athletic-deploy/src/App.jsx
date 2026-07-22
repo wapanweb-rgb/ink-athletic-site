@@ -700,8 +700,9 @@ function startOrbEngine(canvas, refs, cinemaEl) {
       ctx.save();
       gearPathSmooth(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
       ctx.clip("evenodd");
-      for(let i=0;i<64;i++){
-        const a=(i/64)*6.283+Math.sin(i*7.3+seed)*0.05;
+      const NS=gr.R>=28?64:26;
+      for(let i=0;i<NS;i++){
+        const a=(i/NS)*6.283+Math.sin(i*7.3+seed)*0.05;
         const al=0.02+0.05*Math.abs(Math.sin(i*2.7+seed));
         ctx.strokeStyle=i%2?`rgba(255,255,255,${al.toFixed(3)})`:`rgba(10,11,14,${(al*1.25).toFixed(3)})`;
         ctx.lineWidth=0.8;
@@ -791,7 +792,7 @@ function startOrbEngine(canvas, refs, cinemaEl) {
       ctx.beginPath();ctx.arc(0,0,gr.R-1.5,0.5,1.6);ctx.stroke();
       ctx.restore();
       // pulsing star glints at the rim
-      for(let s2=0;s2<2;s2++){
+      for(let s2=0;s2<3;s2++){
         const ga=seed+s2*2.6;
         const gx2=Math.cos(ga)*(gr.R*0.72),gy2=Math.sin(ga)*(gr.R*0.72);
         const tw=Math.pow(Math.max(0,Math.sin(time*1.7+seed+s2*3.1)),6);
@@ -834,9 +835,67 @@ function startOrbEngine(canvas, refs, cinemaEl) {
       {x:62,y:-38,R:36,teeth:11,tooth:6.5,hub:8,spd:-0.53,w:0.88,tone:[255,240,226]},// warm nickel
       {x:34,y:66,R:30,teeth:9,tooth:6,hub:7,spd:0.64,w:0.85,tone:[206,212,228]},   // gunmetal
       {x:-20,y:-92,R:18,teeth:8,tooth:4.5,hub:5,spd:0.98,w:0.8,tone:[255,232,238]}, // rose platinum
-      {x:98,y:26,R:16,teeth:7,tooth:4,hub:4.5,spd:-1.1,w:0.8,tone:[240,246,255]}   // bright silver
+      {x:98,y:26,R:16,teeth:7,tooth:4,hub:4.5,spd:-1.1,w:0.8,tone:[240,246,255]},  // bright silver
+      {x:-104,y:-8,R:14,teeth:7,tooth:4,hub:4,spd:1.3,w:0.78,tone:[226,236,252]},
+      {x:-76,y:-86,R:13,teeth:6,tooth:3.6,hub:3.6,spd:-1.45,w:0.76,tone:[255,240,226]},
+      {x:24,y:-114,R:15,teeth:7,tooth:4,hub:4.2,spd:1.15,w:0.78,tone:[240,246,255]},
+      {x:108,y:-62,R:13,teeth:6,tooth:3.6,hub:3.6,spd:-1.5,w:0.76,tone:[206,212,228]},
+      {x:-30,y:104,R:16,teeth:8,tooth:4.2,hub:4.5,spd:-0.95,w:0.8,tone:[255,232,238]},
+      {x:64,y:108,R:14,teeth:7,tooth:4,hub:4,spd:1.25,w:0.78,tone:[226,236,252]},
+      {x:-128,y:32,R:11,teeth:6,tooth:3.2,hub:3.2,spd:1.7,w:0.74,tone:[255,255,255]},
+      {x:132,y:-30,R:11,teeth:6,tooth:3.2,hub:3.2,spd:-1.75,w:0.74,tone:[255,240,226]}
     ];
     for(const gr of gears)drawGear(gr,time*gr.spd+(gr.x+gr.y));
+    // ---- trapped-plasma capsules: tiny tesla-coil electronics, live arcs
+    // dancing inside dark glass with copper windings at the base ----
+    function drawPlasma(px,py,pr,ph){
+      ctx.save();ctx.translate(px,py);
+      ctx.fillStyle="rgba(0,0,0,0.45)";
+      ctx.beginPath();ctx.arc(1.5,2,pr+1,0,6.283);ctx.fill();
+      const shg=ctx.createRadialGradient(-pr*0.3,-pr*0.3,1,0,0,pr);
+      shg.addColorStop(0,"rgba(70,40,48,0.9)");shg.addColorStop(0.7,"rgba(28,14,20,0.95)");shg.addColorStop(1,"rgba(10,6,10,0.98)");
+      ctx.fillStyle=shg;ctx.beginPath();ctx.arc(0,0,pr,0,6.283);ctx.fill();
+      ctx.save();ctx.beginPath();ctx.arc(0,0,pr-0.8,0,6.283);ctx.clip();
+      ctx.globalCompositeOperation="lighter";
+      for(let f=0;f<4;f++){
+        const baseA=ph+f*1.57+Math.sin(time*2.3+ph*3+f)*0.9;
+        ctx.strokeStyle="rgba(255,120,132,0.85)";ctx.lineWidth=1.1;
+        ctx.shadowColor="rgba(255,68,82,0.9)";ctx.shadowBlur=5;
+        ctx.beginPath();ctx.moveTo(0,0);
+        let fx=0,fy=0;
+        for(let s3=1;s3<=3;s3++){
+          const rr2=(pr-1)*s3/3;
+          const a2=baseA+Math.sin(time*13+f*7+s3*5+ph)*0.5;
+          fx=Math.cos(a2)*rr2;fy=Math.sin(a2)*rr2;
+          ctx.lineTo(fx,fy);
+        }
+        ctx.stroke();
+        ctx.fillStyle="rgba(255,220,224,0.9)";
+        ctx.beginPath();ctx.arc(fx,fy,1.2,0,6.283);ctx.fill();
+      }
+      ctx.shadowBlur=8;ctx.fillStyle="rgba(255,190,196,0.95)";
+      ctx.beginPath();ctx.arc(0,0,1.8,0,6.283);ctx.fill();
+      ctx.restore();
+      // glass specular + copper windings at the base
+      ctx.fillStyle="rgba(255,255,255,0.5)";
+      ctx.beginPath();ctx.arc(-pr*0.35,-pr*0.4,pr*0.16,0,6.283);ctx.fill();
+      ctx.strokeStyle="rgba(228,238,248,0.8)";ctx.lineWidth=1;
+      for(let w2=0;w2<3;w2++){
+        ctx.beginPath();ctx.moveTo(-pr*0.5,pr+1.5+w2*1.8);ctx.lineTo(pr*0.5,pr+1.5+w2*1.8);ctx.stroke();
+      }
+      ctx.restore();
+    }
+    drawPlasma(0,-130,9,0.5);
+    drawPlasma(-134,-40,8,2.1);
+    drawPlasma(96,72,8.5,4.2);
+    // slow rotating light sheet across the whole movement
+    ctx.save();ctx.globalCompositeOperation="lighter";
+    const pga=time*0.1;
+    const pg3=ctx.createRadialGradient(0,0,20,0,0,150);
+    pg3.addColorStop(0,"rgba(255,255,255,0)");pg3.addColorStop(0.75,"rgba(255,255,255,0.055)");pg3.addColorStop(1,"rgba(255,255,255,0)");
+    ctx.fillStyle=pg3;
+    ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,148,pga,pga+1.1);ctx.closePath();ctx.fill();
+    ctx.restore();
     // ---- escapement: sawtooth escape wheel + rocking pallet anchor ----
     {
       const ex=-96,ey=58,er=20;
@@ -3067,6 +3126,7 @@ function GreenBG() {
     addEventListener("resize", resize); resize();
 
     let g = 0, grew = false;
+    let prevSeedT = 0, ripple = null;
     const tick = (now) => {
       if (killed) return;
       raf = requestAnimationFrame(tick);
@@ -3078,6 +3138,19 @@ function GreenBG() {
       const frac = max > 0 ? Math.min(1, scrollY / max) : 0;
       const raw = Math.min(1, frac / 0.8);
       const seedT = reduced ? 1 : Math.min(1, (now - seedStart) / 1100);
+      // the instant the essence drop touches down, the page becomes water:
+      // capture every visible element so the wavefronts can push them
+      if (!reduced && prevSeedT < 1 && seedT >= 1) {
+        ripple = {
+          t0: now, x: baseX, y: baseY - unit * 0.018,
+          els: Array.from(document.querySelectorAll(".eco-card, .greenpage h1, .greenpage h2, .greenpage p, .greenpage a, nav"))
+            .filter(el => el.matches(".eco-card") || !el.closest(".eco-card"))
+            .map(el => { const r = el.getBoundingClientRect();
+              return { el, cx: r.left + r.width / 2, cy: r.top + r.height / 2, moved: false }; })
+            .filter(e => e.cy > -300 && e.cy < innerHeight + 500)
+        };
+      }
+      prevSeedT = seedT;
       const target = seedT < 1 ? 0 : raw;
       g = reduced ? target : g + (target - g) * 0.07;
       // life-cycle: fully grown + reaching the very bottom -> dissolve upward;
@@ -3110,19 +3183,42 @@ function GreenBG() {
       if (seedT < 1 || g < 0.035) {
         const falling = seedT < 1;
         const sy = falling ? 86 + (baseY - unit * 0.018 - 86) * sm(seedT) : baseY - unit * 0.012;
-        const glowR = 15 + (reduced ? 0 : Math.sin(time * 2.4) * 3.5);
+        const glowR = 22 + (reduced ? 0 : Math.sin(time * 2.4) * 5);
         const gl = ctx.createRadialGradient(baseX, sy, 0, baseX, sy, glowR);
-        gl.addColorStop(0, "rgba(120,235,165,.5)"); gl.addColorStop(0.55, "rgba(70,190,121,.2)"); gl.addColorStop(1, "rgba(70,190,121,0)");
+        gl.addColorStop(0, "rgba(190,255,220,.7)"); gl.addColorStop(0.45, "rgba(90,220,150,.28)"); gl.addColorStop(1, "rgba(70,190,121,0)");
         ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(baseX, sy, glowR, 0, 6.283); ctx.fill();
-        // polished seed: deep mahogany teardrop with a quiet specular arc
-        ctx.save(); ctx.translate(baseX, sy); if (falling && !reduced) ctx.rotate(seedT * 3);
-        const sg = ctx.createRadialGradient(-1.2, -2, 0.5, 0, 0, 7);
-        sg.addColorStop(0, "#7A5A3C"); sg.addColorStop(0.55, "#553D28"); sg.addColorStop(1, "#332417");
+        // a drop of essence: luminous teardrop, white heart fading to emerald
+        ctx.save(); ctx.translate(baseX, sy);
+        const pul = 1 + (reduced ? 0 : Math.sin(time * 3.2) * 0.07);
+        ctx.scale(pul, pul);
+        ctx.shadowColor = "rgba(120,240,170,.95)"; ctx.shadowBlur = 16;
+        const sg = ctx.createRadialGradient(-1, 1.5, 0.4, 0, 1, 8.5);
+        sg.addColorStop(0, "rgba(255,255,255,.98)");
+        sg.addColorStop(0.35, "rgba(170,255,205,.95)");
+        sg.addColorStop(0.78, "rgba(80,205,135,.9)");
+        sg.addColorStop(1, "rgba(70,190,121,.35)");
         ctx.fillStyle = sg;
-        ctx.beginPath(); ctx.ellipse(0, 0, 4.2, 6, 0.25, 0, 6.283); ctx.fill();
-        ctx.strokeStyle = "rgba(255,244,225,.35)"; ctx.lineWidth = 0.9;
-        ctx.beginPath(); ctx.ellipse(0, 0, 3.1, 4.8, 0.25, 3.6, 4.9); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, -9.5);
+        ctx.quadraticCurveTo(5.4, -1.6, 3.7, 4.4);
+        ctx.quadraticCurveTo(2.2, 7.8, 0, 7.8);
+        ctx.quadraticCurveTo(-2.2, 7.8, -3.7, 4.4);
+        ctx.quadraticCurveTo(-5.4, -1.6, 0, -9.5);
+        ctx.closePath(); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "rgba(255,255,255,.95)";
+        ctx.beginPath(); ctx.arc(-1.3, -0.6, 1.15, 0, 6.283); ctx.fill();
         ctx.restore();
+        // orbiting sparkle motes
+        if (!reduced) for (let m = 0; m < 3; m++) {
+          const am = time * 2.6 + m * 2.094;
+          const mr = 11 + Math.sin(time * 1.7 + m * 1.3) * 2.5;
+          const mx = baseX + Math.cos(am) * mr, my = sy + Math.sin(am) * mr * 0.62;
+          const ma = 0.45 + 0.4 * Math.sin(time * 3 + m * 2.1);
+          ctx.save(); ctx.shadowColor = "rgba(140,250,180,.9)"; ctx.shadowBlur = 6;
+          ctx.fillStyle = `rgba(220,255,235,${Math.max(0.15, ma).toFixed(2)})`;
+          ctx.beginPath(); ctx.arc(mx, my, 1.3, 0, 6.283); ctx.fill(); ctx.restore();
+        }
       }
       drawPads(tree.pads.filter(p => p.z < 0), g, time);
       drawTrunk(g);
@@ -3138,6 +3234,58 @@ function GreenBG() {
       }
       ctx.globalCompositeOperation = "source-over";
       ctx.restore();
+      // ---- the page is water: expanding rings + wavefronts that physically
+      // push every captured element outward as they pass ----
+      if (ripple) {
+        const rt = (now - ripple.t0) / 1000;
+        if (rt > 2.3) {
+          for (const e of ripple.els) { e.el.style.transform = ""; e.el.style.transition = ""; }
+          ripple = null;
+        } else {
+          const speed = 860, band = 150;
+          for (let i = 0; i < 5; i++) {
+            const lt = rt - i * 0.13;
+            if (lt <= 0) continue;
+            const r = 30 + lt * speed;
+            const a = Math.max(0, 1 - lt / 1.7) * 0.4 * (1 - i * 0.13);
+            if (a <= 0.004) continue;
+            // trough (dark), crest (emerald light), sparkle line — reads as water
+            ctx.save();
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = `rgba(8,24,16,${(a * 0.8).toFixed(3)})`;
+            ctx.beginPath(); ctx.arc(ripple.x, ripple.y, Math.max(1, r - 7), 0, 6.283); ctx.stroke();
+            ctx.lineWidth = 2.2;
+            ctx.strokeStyle = `rgba(170,245,205,${a.toFixed(3)})`;
+            ctx.shadowColor = "rgba(70,190,121,0.8)"; ctx.shadowBlur = 12;
+            ctx.beginPath(); ctx.arc(ripple.x, ripple.y, r, 0, 6.283); ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = `rgba(255,255,255,${(a * 0.7).toFixed(3)})`;
+            ctx.beginPath(); ctx.arc(ripple.x, ripple.y, r + 3, 0, 6.283); ctx.stroke();
+            ctx.restore();
+          }
+          for (const e of ripple.els) {
+            const dx = e.cx - ripple.x, dy = e.cy - ripple.y;
+            const d = Math.hypot(dx, dy) || 1;
+            let off = 0;
+            for (let i = 0; i < 5; i++) {
+              const lt = rt - i * 0.13;
+              if (lt <= 0) continue;
+              const r = 30 + lt * speed;
+              const u = (d - r) / band;
+              if (u > -1 && u < 1) off += Math.cos(u * 1.5708) * Math.max(0, 1 - lt / 1.7) * (13 - i * 2);
+            }
+            if (Math.abs(off) > 0.05) {
+              const ux = dx / d, uy = dy / d;
+              e.el.style.transition = "none";
+              e.el.style.transform = `translate3d(${(ux * off).toFixed(1)}px,${(uy * off).toFixed(1)}px,0)`;
+              e.moved = true;
+            } else if (e.moved) {
+              e.el.style.transform = "translate3d(0,0,0)";
+            }
+          }
+        }
+      }
     };
     raf = requestAnimationFrame(tick);
     return () => { killed = true; cancelAnimationFrame(raf); removeEventListener("resize", resize); };
