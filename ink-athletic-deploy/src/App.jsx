@@ -3142,7 +3142,6 @@ function GreenBG() {
     addEventListener("resize", resize); resize();
 
     let g = 0, grew = false;
-    let prevSeedT = 0, ripple = null;
     const tick = (now) => {
       if (killed) return;
       raf = requestAnimationFrame(tick);
@@ -3154,22 +3153,6 @@ function GreenBG() {
       const frac = max > 0 ? Math.min(1, scrollY / max) : 0;
       const raw = Math.min(1, frac / 0.8);
       const seedT = reduced ? 1 : Math.min(1, (now - seedStart) / 1100);
-      // the instant the essence drop touches down, the page becomes water:
-      // capture every visible element so the wavefronts can push them
-      if (!reduced && prevSeedT < 1 && seedT >= 1) {
-        ripple = {
-          t0: now, x: baseX, y: baseY - unit * 0.018, sy0: scrollY,
-          els: Array.from(document.querySelectorAll(".eco-card, .greenpage h1, .greenpage h2, .greenpage p, .greenpage a, nav"))
-            .filter(el => el.matches(".eco-card") || !el.closest(".eco-card"))
-            .map(el => { const r = el.getBoundingClientRect();
-              const cs = getComputedStyle(el).transform;
-              return { el, cx: r.left + r.width / 2, cy: r.top + r.height / 2, moved: false,
-                base: cs && cs !== "none" ? cs + " " : "",
-                prevT: el.style.transform, prevTr: el.style.transition }; })
-            .filter(e => e.cy > -300 && e.cy < innerHeight + 500)
-        };
-      }
-      prevSeedT = seedT;
       const target = seedT < 1 ? 0 : raw;
       g = reduced ? target : g + (target - g) * 0.07;
       // life-cycle: fully grown + reaching the very bottom -> dissolve upward;
@@ -3253,64 +3236,6 @@ function GreenBG() {
       }
       ctx.globalCompositeOperation = "source-over";
       ctx.restore();
-      // ---- the page is water: expanding rings + wavefronts that physically
-      // push every captured element outward as they pass ----
-      if (ripple) {
-        const rt = (now - ripple.t0) / 1000;
-        if (rt > 2.3) {
-          for (const e of ripple.els) { e.el.style.transform = e.prevT || ""; e.el.style.transition = e.prevTr || ""; }
-          ripple = null;
-        } else {
-          // if the user scrolls mid-wave, element positions go stale — let go
-          // of the DOM immediately (the rings finish on their own)
-          if (ripple.els.length && Math.abs(scrollY - ripple.sy0) > 30) {
-            for (const e of ripple.els) { e.el.style.transform = e.prevT || ""; e.el.style.transition = e.prevTr || ""; }
-            ripple.els = [];
-          }
-          const speed = 860, band = 150;
-          for (let i = 0; i < 5; i++) {
-            const lt = rt - i * 0.13;
-            if (lt <= 0) continue;
-            const r = 30 + lt * speed;
-            const a = Math.max(0, 1 - lt / 1.7) * 0.4 * (1 - i * 0.13);
-            if (a <= 0.004) continue;
-            // trough (dark), crest (emerald light), sparkle line — reads as water
-            ctx.save();
-            ctx.lineWidth = 5;
-            ctx.strokeStyle = `rgba(8,24,16,${(a * 0.8).toFixed(3)})`;
-            ctx.beginPath(); ctx.arc(ripple.x, ripple.y, Math.max(1, r - 7), 0, 6.283); ctx.stroke();
-            ctx.lineWidth = 2.2;
-            ctx.strokeStyle = `rgba(170,245,205,${a.toFixed(3)})`;
-            ctx.shadowColor = "rgba(70,190,121,0.8)"; ctx.shadowBlur = 12;
-            ctx.beginPath(); ctx.arc(ripple.x, ripple.y, r, 0, 6.283); ctx.stroke();
-            ctx.shadowBlur = 0;
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = `rgba(255,255,255,${(a * 0.7).toFixed(3)})`;
-            ctx.beginPath(); ctx.arc(ripple.x, ripple.y, r + 3, 0, 6.283); ctx.stroke();
-            ctx.restore();
-          }
-          for (const e of ripple.els) {
-            const dx = e.cx - ripple.x, dy = e.cy - ripple.y;
-            const d = Math.hypot(dx, dy) || 1;
-            let off = 0;
-            for (let i = 0; i < 5; i++) {
-              const lt = rt - i * 0.13;
-              if (lt <= 0) continue;
-              const r = 30 + lt * speed;
-              const u = (d - r) / band;
-              if (u > -1 && u < 1) off += Math.cos(u * 1.5708) * Math.max(0, 1 - lt / 1.7) * (13 - i * 2);
-            }
-            if (Math.abs(off) > 0.05) {
-              const ux = dx / d, uy = dy / d;
-              e.el.style.transition = "none";
-              e.el.style.transform = e.base + `translate3d(${(ux * off).toFixed(1)}px,${(uy * off).toFixed(1)}px,0)`;
-              e.moved = true;
-            } else if (e.moved) {
-              e.el.style.transform = e.base + "translate3d(0,0,0)";
-            }
-          }
-        }
-      }
     };
     raf = requestAnimationFrame(tick);
     return () => { killed = true; cancelAnimationFrame(raf); removeEventListener("resize", resize); };
