@@ -239,12 +239,16 @@ function startOrbEngine(canvas, refs, cinemaEl) {
     grad.addColorStop(0,"#3A3C43");grad.addColorStop(0.34,"#1F2025");
     grad.addColorStop(0.52,"#2C2E35");grad.addColorStop(0.78,"#141518");grad.addColorStop(1,"#212228");
     g.fillStyle=grad;g.fillRect(0,0,S,S);
-    // fine diagonal grain
-    for(let i=0;i<210;i++){
-      const light=Math.random()<0.4;
-      g.strokeStyle=light?`rgba(214,220,230,${(0.02+Math.random()*0.035).toFixed(3)})`:`rgba(8,9,12,${(0.03+Math.random()*0.05).toFixed(3)})`;
-      g.lineWidth=0.6+Math.random()*0.8;
-      const x=Math.random()*S*1.4-S*0.2, y=Math.random()*S, len=8+Math.random()*26;
+    // regular brushed grain — the pyramid faces' 115° 1px/3px stripe pattern
+    g.strokeStyle="rgba(255,255,255,0.028)";g.lineWidth=1;
+    for(let x=-S*0.6;x<S*1.2;x+=3){
+      g.beginPath();g.moveTo(x,0);g.lineTo(x+S*0.47,S);g.stroke();
+    }
+    // a little organic scuffing on top of the regular grain
+    for(let i=0;i<70;i++){
+      g.strokeStyle=`rgba(8,9,12,${(0.03+Math.random()*0.04).toFixed(3)})`;
+      g.lineWidth=0.6+Math.random()*0.7;
+      const x=Math.random()*S*1.4-S*0.2, y=Math.random()*S, len=8+Math.random()*22;
       g.beginPath();g.moveTo(x,y);g.lineTo(x+len*0.42,y+len);g.stroke();
     }
     // baked light sheen band (angle/offset varies per variant)
@@ -253,6 +257,11 @@ function startOrbEngine(canvas, refs, cinemaEl) {
     sh.addColorStop(0,"rgba(255,255,255,0)");sh.addColorStop(0.45,"rgba(255,255,255,0.10)");
     sh.addColorStop(0.52,"rgba(255,170,178,0.07)");sh.addColorStop(0.6,"rgba(255,255,255,0.09)");sh.addColorStop(1,"rgba(255,255,255,0)");
     g.fillStyle=sh;g.fillRect(0,0,S,S);
+    // glassy top-light, exactly like the pyramid faces' overhead lighting
+    const tl=g.createLinearGradient(0,0,0,S);
+    tl.addColorStop(0,"rgba(255,255,255,0.13)");tl.addColorStop(0.32,"rgba(255,255,255,0)");
+    tl.addColorStop(0.6,"rgba(0,0,0,0)");tl.addColorStop(1,"rgba(4,4,6,0.55)");
+    g.fillStyle=tl;g.fillRect(0,0,S,S);
     // microchip traces: orthogonal glowing runs with pads and vias
     const trace=(hot)=>{
       const pts=[];
@@ -337,19 +346,34 @@ function startOrbEngine(canvas, refs, cinemaEl) {
   const CODE_TEX=(()=>{
     const c=document.createElement("canvas");c.width=256;c.height=512;
     const g=c.getContext("2d");
-    const chars="01<>{}/=+*#&$%!?ABCDEF";
-    g.font="11px 'JetBrains Mono',monospace";g.textBaseline="top";
-    for(let col=0;col<15;col++){
-      const x=8+col*16.6;
-      for(let row=0;row<36;row++){
-        if(Math.random()<0.34)continue;
-        const y=4+row*14;
-        const bright=Math.random()<0.14;
-        if(bright){g.save();g.shadowColor="rgba(255,68,82,0.95)";g.shadowBlur=7;
-          g.fillStyle="rgba(255,190,196,0.95)";
+    const chars="01<>{}[]/=+*#&$%!?;:~^ABCDEF0123456789";
+    g.font="8px 'JetBrains Mono',monospace";g.textBaseline="top";
+    // dense base field — hundreds of dim characters
+    for(let col=0;col<26;col++){
+      const x=3+col*9.8;
+      const colDim=0.5+Math.random()*0.5; // whole columns vary in strength
+      for(let row=0;row<56;row++){
+        if(Math.random()<0.18)continue;
+        const y=2+row*9.1;
+        g.fillStyle=`rgba(255,68,82,${(colDim*(0.08+Math.random()*0.3)).toFixed(3)})`;
+        g.fillText(chars[(Math.random()*chars.length)|0],x,y);
+      }
+    }
+    // matrix rain: bright falling streams with white-hot heads
+    for(let d=0;d<10;d++){
+      const x=3+((Math.random()*26)|0)*9.8;
+      const headRow=(Math.random()*56)|0;
+      const len=6+(Math.random()*10)|0;
+      for(let k=0;k<len;k++){
+        const row=((headRow-k)%56+56)%56;
+        const y=2+row*9.1;
+        const fade=1-k/len;
+        if(k===0){g.save();g.shadowColor="rgba(255,120,130,0.95)";g.shadowBlur=8;
+          g.fillStyle="rgba(255,226,230,0.98)";
           g.fillText(chars[(Math.random()*chars.length)|0],x,y);g.restore();}
-        else{g.fillStyle=`rgba(255,68,82,${(0.14+Math.random()*0.4).toFixed(3)})`;
-          g.fillText(chars[(Math.random()*chars.length)|0],x,y);}
+        else{g.save();g.shadowColor="rgba(255,68,82,0.8)";g.shadowBlur=4*fade;
+          g.fillStyle=`rgba(255,${Math.round(80+90*fade)},${Math.round(90+80*fade)},${(0.35+0.6*fade).toFixed(3)})`;
+          g.fillText(chars[(Math.random()*chars.length)|0],x,y);g.restore();}
       }
     }
     return c;
@@ -604,25 +628,48 @@ function startOrbEngine(canvas, refs, cinemaEl) {
     for(const gr of gears){
       ctx.save();
       ctx.translate(gr.x,gr.y);
+      ctx.save();
       ctx.rotate(time*gr.spd+(gr.x+gr.y));
-      const met=ctx.createRadialGradient(-gr.R*0.3,-gr.R*0.3,2,0,0,gr.R);
-      met.addColorStop(0,"rgba(242,244,248,"+(0.95*gr.w)+")");
-      met.addColorStop(0.55,"rgba(178,182,190,"+(0.9*gr.w)+")");
-      met.addColorStop(1,"rgba(94,97,104,"+(0.9*gr.w)+")");
+      // chrome body: high-contrast platinum sweep with a soft white halo
+      const met=ctx.createRadialGradient(-gr.R*0.38,-gr.R*0.38,gr.R*0.05,0,0,gr.R*1.02);
+      met.addColorStop(0,`rgba(255,255,255,${0.98*gr.w})`);
+      met.addColorStop(0.22,`rgba(228,232,239,${0.96*gr.w})`);
+      met.addColorStop(0.48,`rgba(170,175,186,${0.92*gr.w})`);
+      met.addColorStop(0.74,`rgba(112,116,127,${0.92*gr.w})`);
+      met.addColorStop(1,`rgba(58,61,70,${0.92*gr.w})`);
       ctx.fillStyle=met;
-      ctx.strokeStyle=bronzeDD;ctx.lineWidth=1.6;
+      ctx.shadowColor="rgba(255,255,255,0.28)";ctx.shadowBlur=7;
       gearPath(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
-      ctx.fill("evenodd");ctx.stroke();
-      ctx.strokeStyle=bronzeD;ctx.lineWidth=5;
+      ctx.fill("evenodd");
+      ctx.shadowColor="rgba(255,68,82,0.5)";ctx.shadowBlur=10;
+      ctx.strokeStyle="rgba(30,31,36,0.9)";ctx.lineWidth=1.4;ctx.stroke();
+      ctx.shadowBlur=0;
+      // spokes: dark base under a chrome light pass
       for(let k=0;k<4;k++){
         const a=k*Math.PI/2;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(a)*gr.hub,Math.sin(a)*gr.hub);
-        ctx.lineTo(Math.cos(a)*(gr.R-gr.tooth-3),Math.sin(a)*(gr.R-gr.tooth-3));
-        ctx.stroke();
+        ctx.strokeStyle="rgba(40,42,48,0.9)";ctx.lineWidth=6;
+        ctx.beginPath();ctx.moveTo(Math.cos(a)*gr.hub,Math.sin(a)*gr.hub);
+        ctx.lineTo(Math.cos(a)*(gr.R-gr.tooth-3),Math.sin(a)*(gr.R-gr.tooth-3));ctx.stroke();
+        ctx.strokeStyle="rgba(226,230,238,0.85)";ctx.lineWidth=2.6;
+        ctx.beginPath();ctx.moveTo(Math.cos(a)*gr.hub,Math.sin(a)*gr.hub);
+        ctx.lineTo(Math.cos(a)*(gr.R-gr.tooth-3),Math.sin(a)*(gr.R-gr.tooth-3));ctx.stroke();
       }
-      ctx.fillStyle=bronzeDD;ctx.beginPath();ctx.arc(0,0,gr.hub*0.55,0,6.283);ctx.fill();
-      ctx.fillStyle="rgba(246,248,251,0.85)";ctx.beginPath();ctx.arc(-1.5,-1.5,gr.hub*0.2,0,6.283);ctx.fill();
+      // platinum hub with a red jewel core
+      const hubG=ctx.createRadialGradient(-2,-2,1,0,0,gr.hub*0.7);
+      hubG.addColorStop(0,"rgba(250,252,255,0.95)");hubG.addColorStop(0.6,"rgba(180,185,196,0.95)");hubG.addColorStop(1,"rgba(90,94,104,0.95)");
+      ctx.fillStyle=hubG;ctx.beginPath();ctx.arc(0,0,gr.hub*0.62,0,6.283);ctx.fill();
+      ctx.save();ctx.shadowColor="rgba(255,68,82,0.9)";ctx.shadowBlur=8;
+      ctx.fillStyle="#FF4650";ctx.beginPath();ctx.arc(0,0,gr.hub*0.26,0,6.283);ctx.fill();ctx.restore();
+      ctx.restore();
+      // fixed specular arcs — they do NOT rotate with the gear, which is what
+      // makes the metal read as chrome under a steady light
+      ctx.save();
+      ctx.shadowColor="rgba(255,255,255,0.6)";ctx.shadowBlur=6;
+      ctx.strokeStyle=`rgba(255,255,255,${0.5*gr.w})`;ctx.lineWidth=2.6;ctx.lineCap="round";
+      ctx.beginPath();ctx.arc(0,0,gr.R*0.62,-2.4,-1.35);ctx.stroke();
+      ctx.strokeStyle=`rgba(255,255,255,${0.2*gr.w})`;ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.arc(0,0,gr.R*0.8,0.5,1.2);ctx.stroke();
+      ctx.restore();
       ctx.restore();
     }
     ctx.save();
@@ -719,6 +766,11 @@ function startOrbEngine(canvas, refs, cinemaEl) {
     ctx.globalAlpha=0.75;
     ctx.drawImage(CODE_TEX,0,off-512);
     ctx.drawImage(CODE_TEX,0,off);
+    // second code layer, faster and dimmer — parallax depth in the glass
+    const off2=(tN*58+phx*70)%512;
+    ctx.globalAlpha=0.32;
+    ctx.drawImage(CODE_TEX,-4,off2-512);
+    ctx.drawImage(CODE_TEX,-4,off2);
     ctx.globalCompositeOperation="lighter";
     ctx.globalAlpha=0.6;
     const sx=(((tN*52)+phx*90)%740)-500;
