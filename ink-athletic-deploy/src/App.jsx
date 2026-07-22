@@ -3420,8 +3420,34 @@ function AdminPanel({ products, setProducts, site, setSite, onBack }) {
    APP
    ============================================================ */
 
+// Map real URLs <-> app routes so pages are crawlable and back/forward work.
+const routeFromPath = () => {
+  const p = location.pathname;
+  if (p === "/green") return { page: "green" };
+  if (p === "/admin") return { page: "admin" };
+  const m = p.match(/^\/product\/([\w-]+)\/?$/);
+  if (m) return { page: "product", id: m[1] };
+  return { page: "home" };
+};
+const pathFromRoute = (r) => {
+  if (r.page === "green") return "/green";
+  if (r.page === "admin") return "/admin";
+  if (r.page === "product") return "/product/" + r.id;
+  return "/";
+};
+
 export default function App() {
-  const [route, setRoute] = useState({ page: "home" });
+  const [route, setRouteState] = useState(routeFromPath);
+  const setRoute = (r) => {
+    setRouteState(r);
+    const path = pathFromRoute(typeof r === "function" ? r(route) : r);
+    if (location.pathname !== path) history.pushState({}, "", path);
+  };
+  useEffect(() => {
+    const onPop = () => setRouteState(routeFromPath());
+    addEventListener("popstate", onPop);
+    return () => removeEventListener("popstate", onPop);
+  }, []);
   const [quote, setQuote] = useState({});
   const [cart, setCart] = useState(() => {
     try { return JSON.parse(localStorage.getItem("ia_cart") || "{}") || {}; } catch (e) { return {}; }
@@ -3581,6 +3607,14 @@ export default function App() {
 
   const product = route.page === "product" ? products.find(p => p.id === route.id) : null;
   const isAdminRoute = route.page === "admin";
+
+  // Per-page titles for search engines and browser tabs.
+  useEffect(() => {
+    if (route.page === "green") document.title = "Sustainability — Local-First AI | Ink Athletic Ltd.";
+    else if (product) document.title = product.name + " | Ink Athletic Ltd.";
+    else if (isAdminRoute) document.title = "Admin | Ink Athletic Ltd.";
+    else document.title = site.titleLine;
+  }, [route, product, isAdminRoute, site.titleLine]);
 
   return (
     <>
