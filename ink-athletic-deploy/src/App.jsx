@@ -2432,7 +2432,6 @@ function GreenBG() {
         for (const p of pads) {
           p.x = fx(p.x); p.y = fy(p.y); p.rx *= S; p.ry *= S;
           for (const l of p.leaves) { l.dx *= S; l.dy *= S; l.s *= S; }
-          for (const tw of p.twigs) { tw.x2 *= S; tw.y2 *= S; }
         }
       }
       for (let j = 0; j < spine.length; j++) {
@@ -2454,7 +2453,6 @@ function GreenBG() {
       mkBark(); mkLeafSprites();
       build(); // same seed -> same tree, refit to the new bounds
     };
-    addEventListener("resize", resize); resize();
 
     const strandCol = (depth, tint) => {
       const l = (0.7 + 0.34 * Math.max(0, depth)) * (1 + tint);
@@ -2664,6 +2662,9 @@ function GreenBG() {
         }
       }
     };
+
+    // init AFTER every helper above is defined (build -> buildMandala etc.)
+    addEventListener("resize", resize); resize();
 
     let g = 0, grew = false;
     const tick = (now) => {
