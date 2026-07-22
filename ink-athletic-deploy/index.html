@@ -76,26 +76,21 @@
     <style>
       /* pre-app paint: match the site so there is no white flash */
       html, body { background: #060506; color: #9BA1AA; margin: 0; }
-      #seo-fallback { font-family: system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 12vh 24px; font-size: 14px; line-height: 1.7; opacity: .55; }
-      #seo-fallback h1 { font-size: 18px; color: #F2F3F5; font-weight: 600; }
-      #seo-fallback a { color: #FF4650; }
     </style>
   </head>
   <body>
-    <div id="root">
-      <div id="seo-fallback">
-        <!-- Crawlable fallback: replaced by the app on load -->
-        <h1>Ink Athletic Ltd. — Web Design, AI Engineering &amp; 3D Printing in Canada</h1>
-        <p>Ink Athletic Ltd. is an Indigenous-owned Canadian technology company in Fort St. John, British Columbia. We build custom websites, AI-engineered software, interactive AI kiosks, QR display kiosks, and custom 3D prints — designed around your business and shipped across Canada.</p>
-        <ul>
-          <li>Web design and web development (mobile-first, e-commerce, CMS)</li>
-          <li>AI engineering, business automation, and custom software</li>
-          <li>Interactive AI kiosks and digital signage</li>
-          <li>Custom 3D printing</li>
-        </ul>
-        <p>Contact: <a href="mailto:brandon@inkathletic.ca">brandon@inkathletic.ca</a> · 9711 100th Ave, Unit 208, Fort St. John, BC V1J 1Y2 · <a href="/green">Our sustainability &amp; local-first approach</a></p>
-      </div>
-    </div>
+    <div id="root"></div>
+    <noscript>
+      <h1>Ink Athletic Ltd. — Web Design, AI Engineering &amp; 3D Printing in Canada</h1>
+      <p>Ink Athletic Ltd. is an Indigenous-owned Canadian technology company in Fort St. John, British Columbia. We build custom websites, AI-engineered software, interactive AI kiosks, QR display kiosks, and custom 3D prints — designed around your business and shipped across Canada.</p>
+      <ul>
+        <li>Web design and web development (mobile-first, e-commerce, CMS)</li>
+        <li>AI engineering, business automation, and custom software</li>
+        <li>Interactive AI kiosks and digital signage</li>
+        <li>Custom 3D printing</li>
+      </ul>
+      <p>Contact: <a href="mailto:brandon@inkathletic.ca">brandon@inkathletic.ca</a> · 9711 100th Ave, Unit 208, Fort St. John, BC V1J 1Y2 · <a href="/green">Our sustainability &amp; local-first approach</a></p>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
