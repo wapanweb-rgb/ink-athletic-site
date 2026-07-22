@@ -2485,14 +2485,14 @@ function GreenBG() {
         for (let k = 0; k < 6; k++) { const a = k * 1.0472; cs.push([Math.cos(a) * 4 * rr, Math.sin(a) * 4 * rr]); }
         for (const c of cs) circle(c[0], c[1], rr, 24);
         for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) line(cs[i][0], cs[i][1], cs[j][0], cs[j][1], 5);
-      } else if (type === 3) { // hexagram
-        const tri = (rot) => {
-          const v = [];
-          for (let k = 0; k < 3; k++) { const a = rot + k * 2.0944; v.push([Math.cos(a), Math.sin(a)]); }
-          for (let k = 0; k < 3; k++) { const b2 = v[(k + 1) % 3]; line(v[k][0], v[k][1], b2[0], b2[1], 58); }
-        };
-        tri(-1.5708); tri(1.5708);
-        circle(0, 0, 1, 128); circle(0, 0, 0.58, 88);
+      } else if (type === 3) { // phyllotaxis (golden-angle sunflower spiral)
+        const GA = 2.39996;
+        for (let i = 0; i < 660; i++) {
+          const rr2 = 0.985 * Math.sqrt(i / 660);
+          const a = i * GA;
+          pts.push([Math.cos(a) * rr2, Math.sin(a) * rr2]);
+        }
+        circle(0, 0, 1, 130);
       } else if (type === 4) { // golden spiral
         const b = Math.log(1.618) / 1.5708;
         for (let i = 0; i < 620; i++) { const th = (i / 620) * 12.4; const rr2 = 0.055 * Math.exp(b * th); if (rr2 > 1) break; pts.push([Math.cos(th) * rr2, Math.sin(th) * rr2]); }
