@@ -61,10 +61,15 @@ export function buildParcel(cart, catalog) {
 export async function getShippoRates({ token, addressTo, parcel }) {
   const res = await fetch("https://api.goshippo.com/shipments/", {
     method: "POST",
-    headers: { Authorization: "ShippoToken " + token, "Content-Type": "application/json" },
+    headers: { Authorization: "ShippoToken " + token.trim(), "Content-Type": "application/json" },
     body: JSON.stringify({ address_from: SHIP_FROM, address_to: addressTo, parcels: [parcel], async: false })
   });
-  const data = await res.json().catch(() => ({}));
+  const raw = await res.text();
+  let data = {};
+  try { data = JSON.parse(raw); } catch (e) { /* non-JSON body */ }
+  if (!res.ok) {
+    throw new Error("Shippo " + res.status + ": " + raw.slice(0, 260));
+  }
   const rates = Array.isArray(data.rates) ? data.rates : [];
   const norm = rates
     .map((r) => ({
