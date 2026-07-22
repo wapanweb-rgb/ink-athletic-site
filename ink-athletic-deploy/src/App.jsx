@@ -2326,7 +2326,7 @@ function GreenBG() {
       const style = Math.floor(rnd() * 4);
       const wind = rnd() < 0.5 ? -1 : 1;
       baseX = (W > 760 ? W * 0.60 : W * 0.5) - (style === 3 ? wind * unit * 0.05 : 0);
-      const branches = [], pads = [], grass = [], hangs = [], nodes = [], spine = [];
+      const branches = [], pads = [], grass = [], nodes = [], spine = [];
 
       const segAngles = [];
       if (style === 0) { const s0 = rnd() < 0.5 ? 1 : -1; segAngles.push(J(-0.08, 0.08), s0 * J(0.35, 0.55), -s0 * J(0.3, 0.5), s0 * J(0.2, 0.35)); }
@@ -2374,11 +2374,7 @@ function GreenBG() {
         return [ex, ey, a2, g1];
       };
       const mkPad = (x, y, rx, ry, z, g0) => {
-        const leaves = [], twigs = [];
-        for (let i = 0; i < 6; i++) {
-          const a = rnd() * 6.283;
-          twigs.push({ x2: Math.cos(a) * rx * J(0.4, 0.85), y2: Math.sin(a) * ry * J(0.4, 0.85) });
-        }
+        const leaves = [];
         const n = Math.round((rx * ry) / 12) + 50;
         for (let i = 0; i < n; i++) {
           const a = rnd() * 6.283, rr = Math.pow(rnd(), 0.65);
@@ -2386,7 +2382,7 @@ function GreenBG() {
           const k = Math.max(0, Math.min(1, 0.55 - (dx / rx) * 0.2 - (dy / ry) * 0.42 + (rnd() - 0.5) * 0.3));
           leaves.push({ dx, dy, rot: rnd() * 6.28, s: unit * (0.0023 + rnd() * 0.0022), g: Math.min(0.985, g0 + rnd() * 0.07), k });
         }
-        pads.push({ x, y, rx, ry, z, g0, leaves, twigs, ph: rnd() * 6.28, cv: null, popped: false });
+        pads.push({ x, y, rx, ry, z, g0, leaves, ph: rnd() * 6.28, cv: null, popped: false });
       };
 
       const tierLen = [0.23, 0.19, 0.155, 0.12];
@@ -2417,11 +2413,6 @@ function GreenBG() {
         mkPad(t[0], t[1] + unit * 0.005, unit * 0.06, unit * 0.028, 0.2, t[3]);
         mkPad(nodes[1].x - wind * unit * 0.022, nodes[1].y - unit * 0.055, unit * 0.066, unit * 0.03, -0.2, nodes[1].g + 0.15);
       }
-      const nH = 2 + Math.floor(rnd() * 2);
-      for (let i = 0; i < nH; i++) {
-        const s = spine[6 + Math.floor(rnd() * 12)];
-        hangs.push({ x: s.x + J(-6, 6), y: s.y, dx: J(-0.03, 0.03) * unit, g0: 0.5 + rnd() * 0.2, ph: rnd() * 6.28 });
-      }
       for (let i = 0; i < 12; i++) grass.push({ x: baseX + (rnd() - 0.5) * unit * 0.2, l: unit * (0.009 + rnd() * 0.013), a: (rnd() - 0.5) * 0.9, ph: rnd() * 6.28 });
 
       /* ---- fit the whole tree inside the viewport, any screen ---- */
@@ -2443,7 +2434,6 @@ function GreenBG() {
           for (const l of p.leaves) { l.dx *= S; l.dy *= S; l.s *= S; }
           for (const tw of p.twigs) { tw.x2 *= S; tw.y2 *= S; }
         }
-        for (const hg of hangs) { hg.x = fx(hg.x); hg.y = fy(hg.y); hg.dx *= S; }
       }
       for (let j = 0; j < spine.length; j++) {
         const a = spine[Math.max(0, j - 1)], b = spine[Math.min(spine.length - 1, j + 1)];
@@ -2452,7 +2442,8 @@ function GreenBG() {
       }
       pads.sort((a, b) => a.z - b.z);
       branches.sort((a, b) => a.z - b.z);
-      tree = { spine, strands, branches, pads, grass, hangs, style };
+      const mand = buildMandala(treeSeed, baseX, baseY - unit * 0.30, Math.min(unit * 0.27, W * 0.42));
+      tree = { spine, strands, branches, pads, grass, style, mand };
     };
 
     const resize = () => {
@@ -2470,41 +2461,94 @@ function GreenBG() {
       return "rgb(" + Math.round(126 * l) + "," + Math.round(117 * l) + "," + Math.round(103 * l) + ")";
     };
 
-    /* elegant unglazed dark-clay dish (tokoname style) */
-    const drawPot = () => {
-      const rx = unit * 0.115, h = unit * 0.042;
-      const grad = ctx.createLinearGradient(0, baseY, 0, baseY + h);
-      grad.addColorStop(0, "#453B31"); grad.addColorStop(0.55, "#332B23"); grad.addColorStop(1, "#241E18");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.moveTo(baseX - rx, baseY);
-      ctx.bezierCurveTo(baseX - rx * 1.01, baseY + h * 0.62, baseX - rx * 0.88, baseY + h * 0.94, baseX - rx * 0.72, baseY + h * 0.94);
-      ctx.lineTo(baseX + rx * 0.72, baseY + h * 0.94);
-      ctx.bezierCurveTo(baseX + rx * 0.88, baseY + h * 0.94, baseX + rx * 1.01, baseY + h * 0.62, baseX + rx, baseY);
-      ctx.closePath(); ctx.fill();
-      // foot ring
-      ctx.fillStyle = "#1D1813";
-      ctx.fillRect(baseX - rx * 0.5, baseY + h * 0.94, rx, h * 0.09);
-      // soft sheen, single incised line — quiet, high-end
-      const sheen = ctx.createLinearGradient(baseX - rx, 0, baseX + rx * 0.3, 0);
-      sheen.addColorStop(0, "rgba(214,200,180,0)"); sheen.addColorStop(0.45, "rgba(214,200,180,.10)"); sheen.addColorStop(1, "rgba(214,200,180,0)");
-      ctx.fillStyle = sheen;
-      ctx.beginPath();
-      ctx.moveTo(baseX - rx, baseY);
-      ctx.bezierCurveTo(baseX - rx * 1.01, baseY + h * 0.62, baseX - rx * 0.88, baseY + h * 0.94, baseX - rx * 0.72, baseY + h * 0.94);
-      ctx.lineTo(baseX + rx * 0.72, baseY + h * 0.94);
-      ctx.bezierCurveTo(baseX + rx * 0.88, baseY + h * 0.94, baseX + rx * 1.01, baseY + h * 0.62, baseX + rx, baseY);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(baseX - rx * 0.93, baseY + h * 0.42); ctx.lineTo(baseX + rx * 0.93, baseY + h * 0.42); ctx.stroke();
-      // rim edge light
-      ctx.strokeStyle = "rgba(226,212,192,.30)"; ctx.lineWidth = 1.1;
-      ctx.beginPath(); ctx.moveTo(baseX - rx, baseY); ctx.lineTo(baseX + rx, baseY); ctx.stroke();
-      // soil
-      ctx.fillStyle = "#1E1812";
-      ctx.beginPath(); ctx.ellipse(baseX, baseY + 1, rx * 0.9, unit * 0.008, 0, 0, 6.283); ctx.fill();
-      ctx.fillStyle = "rgba(70,190,121,.28)";
-      for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.arc(baseX + Math.sin(i * 2.1) * rx * 0.62, baseY + Math.cos(i * 1.7) * unit * 0.004, 1.1, 0, 6.283); ctx.fill(); }
+    /* ---- sacred-geometry mandala: ~800 particles swarm from the seed
+       into a figure chosen by the tree's seed — a new one every cycle ---- */
+    const buildMandala = (seedNum, cx, cy, R) => {
+      const r = mkRnd((seedNum ^ 0x51ED270) | 0);
+      const type = Math.abs(seedNum) % 6;
+      const pts = [];
+      const circle = (ox, oy, rr, n) => { for (let i = 0; i < n; i++) { const a = (i / n) * 6.283; pts.push([ox + Math.cos(a) * rr, oy + Math.sin(a) * rr]); } };
+      const line = (x0, y0, x1, y1, n) => { for (let i = 0; i <= n; i++) { const t = i / n; pts.push([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t]); } };
+      if (type === 0) { // flower of life
+        const rr = 1 / 3; const cs = [[0, 0]];
+        for (let k = 0; k < 6; k++) { const a = k * 1.0472; cs.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
+        for (let k = 0; k < 6; k++) { const a = k * 1.0472; cs.push([Math.cos(a) * 2 * rr, Math.sin(a) * 2 * rr]); }
+        for (let k = 0; k < 6; k++) { const a = k * 1.0472 + 0.5236; cs.push([Math.cos(a) * 1.732 * rr, Math.sin(a) * 1.732 * rr]); }
+        for (const c of cs) circle(c[0], c[1], rr, 38);
+        circle(0, 0, 1, 60);
+      } else if (type === 1) { // seed of life
+        const rr = 0.5;
+        circle(0, 0, rr, 105);
+        for (let k = 0; k < 6; k++) { const a = k * 1.0472; circle(Math.cos(a) * rr, Math.sin(a) * rr, rr, 92); }
+        circle(0, 0, 1, 120);
+      } else if (type === 2) { // metatron's cube
+        const rr = 0.2; const cs = [[0, 0]];
+        for (let k = 0; k < 6; k++) { const a = k * 1.0472; cs.push([Math.cos(a) * 2 * rr, Math.sin(a) * 2 * rr]); }
+        for (let k = 0; k < 6; k++) { const a = k * 1.0472; cs.push([Math.cos(a) * 4 * rr, Math.sin(a) * 4 * rr]); }
+        for (const c of cs) circle(c[0], c[1], rr, 24);
+        for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) line(cs[i][0], cs[i][1], cs[j][0], cs[j][1], 5);
+      } else if (type === 3) { // hexagram
+        const tri = (rot) => {
+          const v = [];
+          for (let k = 0; k < 3; k++) { const a = rot + k * 2.0944; v.push([Math.cos(a), Math.sin(a)]); }
+          for (let k = 0; k < 3; k++) { const b2 = v[(k + 1) % 3]; line(v[k][0], v[k][1], b2[0], b2[1], 58); }
+        };
+        tri(-1.5708); tri(1.5708);
+        circle(0, 0, 1, 128); circle(0, 0, 0.58, 88);
+      } else if (type === 4) { // golden spiral
+        const b = Math.log(1.618) / 1.5708;
+        for (let i = 0; i < 620; i++) { const th = (i / 620) * 12.4; const rr2 = 0.055 * Math.exp(b * th); if (rr2 > 1) break; pts.push([Math.cos(th) * rr2, Math.sin(th) * rr2]); }
+        circle(0, 0, 1, 150);
+      } else { // torus mandala
+        for (let k = 0; k < 16; k++) { const a = k * 0.3927; circle(Math.cos(a) * 0.5, Math.sin(a) * 0.5, 0.5, 48); }
+      }
+      while (pts.length > 800) pts.splice(Math.floor(r() * pts.length), 1);
+      const parts = pts.map((p2) => ({
+        tx: cx + p2[0] * R, ty: cy + p2[1] * R,
+        delay: r() * 950, ph: r() * 6.28, sz: 0.9 + r() * 1.5
+      }));
+      return { parts, cx, cy, R, type };
+    };
+    const drawMandala = (now, time) => {
+      const m = tree.mand; if (!m) return;
+      const t0 = seedStart + 1150;
+      if (!reduced && now < t0) return;
+      const sx = baseX, sy = baseY - unit * 0.012;
+      ctx.globalCompositeOperation = "lighter";
+      const pulse = 0.05 + 0.03 * Math.sin(time * 1.1);
+      const aur = ctx.createRadialGradient(m.cx, m.cy, 0, m.cx, m.cy, m.R * 1.15);
+      aur.addColorStop(0, "rgba(70,190,121," + pulse.toFixed(3) + ")");
+      aur.addColorStop(1, "rgba(70,190,121,0)");
+      ctx.fillStyle = aur; ctx.fillRect(m.cx - m.R * 1.2, m.cy - m.R * 1.2, m.R * 2.4, m.R * 2.4);
+      for (const p2 of m.parts) {
+        const pp = reduced ? 1 : Math.min(1, Math.max(0, (now - t0 - p2.delay) / 1500));
+        let x, y, al;
+        if (pp < 1) {
+          const e = sm(pp);
+          const swirl = Math.sin(pp * 6.283 + p2.ph) * 46 * (1 - pp);
+          const dx = p2.tx - sx, dy = p2.ty - sy;
+          const L = Math.hypot(dx, dy) || 1;
+          x = sx + dx * e + (-dy / L) * swirl;
+          y = sy + dy * e + (dx / L) * swirl;
+          al = 0.55 * (0.3 + 0.7 * pp);
+        } else {
+          const br = 1 + 0.02 * Math.sin(time * 1.3 + p2.ph);
+          x = m.cx + (p2.tx - m.cx) * br;
+          y = m.cy + (p2.ty - m.cy) * br;
+          al = 0.26 + 0.22 * (0.5 + 0.5 * Math.sin(time * 1.2 + p2.ph));
+        }
+        ctx.fillStyle = "rgba(124,232,168," + al.toFixed(3) + ")";
+        ctx.fillRect(x - p2.sz / 2, y - p2.sz / 2, p2.sz, p2.sz);
+      }
+      if (!reduced && Math.random() < 0.25 && sparks.length < 110) {
+        const p2 = m.parts[Math.floor(Math.random() * m.parts.length)];
+        sparks.push({ x: p2.tx, y: p2.ty, vx: (Math.random() - 0.5) * 0.5, vy: -0.2 - Math.random() * 0.5, life: 1, s: 0.8 + Math.random() * 1.6 });
+      }
+      ctx.globalCompositeOperation = "source-over";
+    };
+    const drawGround = () => {
+      ctx.fillStyle = "rgba(10,14,11,.7)";
+      ctx.beginPath(); ctx.ellipse(baseX, baseY + 4, unit * 0.09, unit * 0.011, 0, 0, 6.283); ctx.fill();
     };
 
     const drawTrunk = (g) => {
@@ -2584,8 +2628,6 @@ function GreenBG() {
       const cx = cw / 2, cy = p.ry + padPx;
       c.fillStyle = "rgba(8,24,14,.5)";
       c.beginPath(); c.ellipse(cx, cy + p.ry * 0.35, p.rx * 1.02, p.ry * 0.95, 0, 0, 6.283); c.fill();
-      c.strokeStyle = "rgba(70,60,48,.6)"; c.lineWidth = 1.1; c.lineCap = "round";
-      for (const tw of p.twigs) { c.beginPath(); c.moveTo(cx, cy + p.ry * 0.2); c.lineTo(cx + tw.x2, cy + tw.y2); c.stroke(); }
       for (const l of p.leaves) {
         const spr = leafSprites[Math.min(4, Math.floor(l.k * 5))];
         const lw = l.s * 3.4, lh = lw * 0.57;
@@ -2611,8 +2653,6 @@ function GreenBG() {
         } else {
           ctx.fillStyle = "rgba(8,24,14," + (0.5 * e).toFixed(3) + ")";
           ctx.beginPath(); ctx.ellipse(p.x + sw, p.y + p.ry * 0.35, p.rx * 1.02 * e, p.ry * 0.95 * e, 0, 0, 6.283); ctx.fill();
-          ctx.strokeStyle = "rgba(70,60,48,.6)"; ctx.lineWidth = 1.1;
-          for (const tw of p.twigs) { ctx.beginPath(); ctx.moveTo(p.x + sw, p.y + p.ry * 0.2); ctx.lineTo(p.x + tw.x2 * e + sw, p.y + tw.y2 * e); ctx.stroke(); }
           for (const l of p.leaves) {
             if (g < l.g) continue;
             const ls = l.s * sm(Math.min(1, (g - l.g) / 0.045));
@@ -2651,10 +2691,11 @@ function GreenBG() {
         build();
       }
 
-      drawPot();
+      drawGround();
       ctx.save();
       ctx.globalAlpha = fade;
       ctx.translate(0, -(1 - fade) * unit * 0.05);
+      drawMandala(now, time);
       const gg = Math.min(1, g / 0.1);
       if (gg > 0.01) {
         ctx.strokeStyle = "rgba(70,190,121,.45)"; ctx.lineWidth = 1.2;
@@ -2685,16 +2726,6 @@ function GreenBG() {
       drawPads(tree.pads.filter(p => p.z < 0), g, time);
       drawTrunk(g);
       for (const b of tree.branches) drawLimb(b, g);
-      for (const hgt of tree.hangs) {
-        const t = (g - hgt.g0) / 0.15;
-        if (t <= 0) continue;
-        const e = sm(Math.min(1, t));
-        const sway = reduced ? 0 : Math.sin(time * 0.8 + hgt.ph) * 2;
-        ctx.strokeStyle = "rgba(132,120,102,.75)"; ctx.lineWidth = 1.5; ctx.lineCap = "round";
-        ctx.beginPath(); ctx.moveTo(hgt.x, hgt.y);
-        ctx.quadraticCurveTo(hgt.x + hgt.dx * 0.6 + sway, hgt.y + (baseY - hgt.y) * 0.6 * e, hgt.x + hgt.dx + sway, hgt.y + (baseY - hgt.y) * e);
-        ctx.stroke();
-      }
       drawPads(tree.pads.filter(p => p.z >= 0), g, time);
       ctx.globalCompositeOperation = "lighter";
       for (let i = sparks.length - 1; i >= 0; i--) {
