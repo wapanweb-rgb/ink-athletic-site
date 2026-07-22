@@ -2267,29 +2267,74 @@ function GreenBG() {
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     let W = 0, H = 0, DPR = 1, raf = 0, killed = false;
     let tree = null, baseX = 0, baseY = 0, unit = 900;
-    const seedStart = performance.now();
-    const rnd = Math.random;
-    const J = (a, b) => a + rnd() * (b - a);
-    const sm = (t) => t * t * (3 - 2 * t);
+    let seedStart = performance.now();
+    let treeSeed = Math.floor(Math.random() * 1e9);
     const sparks = [];
+    const sm = (t) => t * t * (3 - 2 * t);
+    // seeded rng: the same tree survives mobile URL-bar resizes; a fresh
+    // seed is only planted when the life-cycle loops back to the seed.
+    const mkRnd = (s0) => { let s = s0 | 0; return () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+
+    /* fine bark texture pattern (flecks + short fissures) */
+    let barkPat = null;
+    const mkBark = () => {
+      const c = document.createElement("canvas"); c.width = c.height = 46;
+      const b = c.getContext("2d");
+      const r = mkRnd(1234567);
+      for (let i = 0; i < 60; i++) {
+        const dk = r() < 0.72;
+        b.strokeStyle = dk ? "rgba(24,18,12," + (0.10 + r() * 0.22).toFixed(2) + ")" : "rgba(205,190,166," + (0.05 + r() * 0.09).toFixed(2) + ")";
+        b.lineWidth = 0.5 + r() * 1.1;
+        const x = r() * 46, y = r() * 46, len = 2 + r() * 7, dx = (r() - 0.5) * 2.5;
+        b.beginPath(); b.moveTo(x, y); b.quadraticCurveTo(x + dx, y + len * 0.5, x + dx * 0.4, y + len); b.stroke();
+      }
+      barkPat = ctx.createPattern(c, "repeat");
+    };
+
+    /* leaf sprites: pointed leaves with a midrib, five light buckets */
+    const leafSprites = [];
+    const leafColRGB = (k) => [Math.round(20 + 112 * k), Math.round(66 + 148 * k), Math.round(38 + 110 * k)];
+    const mkLeafSprites = () => {
+      leafSprites.length = 0;
+      for (let bkt = 0; bkt < 5; bkt++) {
+        const k = bkt / 4;
+        const s = 28, cv = document.createElement("canvas");
+        cv.width = s; cv.height = 16;
+        const c = cv.getContext("2d");
+        const [r0, g0b, b0] = leafColRGB(Math.max(0, k - 0.12));
+        const [r1, g1b, b1] = leafColRGB(Math.min(1, k + 0.22));
+        const grad = c.createLinearGradient(2, 0, s - 2, 0);
+        grad.addColorStop(0, "rgb(" + r0 + "," + g0b + "," + b0 + ")");
+        grad.addColorStop(1, "rgb(" + r1 + "," + g1b + "," + b1 + ")");
+        c.fillStyle = grad;
+        c.beginPath();
+        c.moveTo(2, 8);
+        c.quadraticCurveTo(s * 0.38, 0.5, s - 2, 8);
+        c.quadraticCurveTo(s * 0.38, 15.5, 2, 8);
+        c.closePath(); c.fill();
+        c.strokeStyle = "rgba(10,30,16,.4)"; c.lineWidth = 0.9;
+        c.beginPath(); c.moveTo(3, 8); c.lineTo(s - 4, 8); c.stroke();
+        leafSprites.push(cv);
+      }
+    };
 
     const build = () => {
+      const rnd = mkRnd(treeSeed);
+      const J = (a, b) => a + rnd() * (b - a);
       unit = Math.min(H, 1100);
-      baseY = H * 0.87;
-      const style = Math.floor(rnd() * 4); // informal / slant / windswept / semi-cascade
+      baseY = H * 0.86;
+      const style = Math.floor(rnd() * 4);
       const wind = rnd() < 0.5 ? -1 : 1;
       baseX = (W > 760 ? W * 0.60 : W * 0.5) - (style === 3 ? wind * unit * 0.05 : 0);
-      const branches = [], pads = [], grass = [], hangs = [], nodes = [];
-      const spine = [];
+      const branches = [], pads = [], grass = [], hangs = [], nodes = [], spine = [];
 
-      /* ---- trunk spine: sampled path the braid will follow ---- */
       const segAngles = [];
       if (style === 0) { const s0 = rnd() < 0.5 ? 1 : -1; segAngles.push(J(-0.08, 0.08), s0 * J(0.35, 0.55), -s0 * J(0.3, 0.5), s0 * J(0.2, 0.35)); }
       else if (style === 1) { segAngles.push(wind * J(0.4, 0.55), wind * J(0.5, 0.65), wind * J(0.35, 0.5), wind * J(0.45, 0.6)); }
       else if (style === 2) { segAngles.push(wind * J(0.5, 0.65), wind * J(0.7, 0.85), wind * J(0.8, 0.95), wind * J(0.9, 1.05)); }
       else { segAngles.push(wind * -0.12, wind * J(0.7, 0.9), wind * J(1.9, 2.2), wind * J(2.4, 2.7)); }
       const segLens = style === 3 ? [0.22, 0.16, 0.16, 0.15] : [0.25, 0.20, 0.155, 0.125];
-      let sx = baseX, sy = baseY - unit * 0.006, sw = unit * 0.054, gC = 0.02;
+      let sx = baseX, sy = baseY - unit * 0.006, sw = unit * 0.05, gC = 0.02;
       for (let i = 0; i < 4; i++) {
         const ang = segAngles[i], len = unit * segLens[i];
         const bend = (rnd() - 0.5) * 0.3;
@@ -2309,17 +2354,9 @@ function GreenBG() {
         nodes.push({ x: ex, y: ey, ang: a2, g: g1, i });
       }
       spine.push({ x: sx, y: sy, w: sw, g: gC + 0.012 });
-      // precompute normals + braid phase axis
-      for (let j = 0; j < spine.length; j++) {
-        const a = spine[Math.max(0, j - 1)], b = spine[Math.min(spine.length - 1, j + 1)];
-        const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
-        spine[j].nx = -dy / L; spine[j].ny = dx / L; spine[j].u = j / (spine.length - 1);
-      }
       const strands = [];
-      const NS = 5;
-      for (let i = 0; i < NS; i++) strands.push({ phase: (i / NS) * 6.283 + J(-0.3, 0.3), freq: J(1.6, 2.3), wf: J(0.30, 0.42), tint: J(-0.1, 0.12) });
+      for (let i = 0; i < 5; i++) strands.push({ phase: (i / 5) * 6.283 + J(-0.3, 0.3), freq: J(1.6, 2.3), wf: J(0.30, 0.42), tint: J(-0.1, 0.12) });
 
-      /* ---- limbs (branches) as smooth tapered polylines ---- */
       const limb = (x, y, ang, len, w0, w1, g0, g1, z, bendMag) => {
         const bend = (rnd() - 0.5) * bendMag;
         const a1 = ang + bend * 0.6, a2 = ang + bend;
@@ -2347,7 +2384,7 @@ function GreenBG() {
           const a = rnd() * 6.283, rr = Math.pow(rnd(), 0.65);
           const dx = Math.cos(a) * rx * rr, dy = Math.sin(a) * ry * rr;
           const k = Math.max(0, Math.min(1, 0.55 - (dx / rx) * 0.2 - (dy / ry) * 0.42 + (rnd() - 0.5) * 0.3));
-          leaves.push({ dx, dy, rot: rnd() * 3.14, s: unit * (0.0022 + rnd() * 0.0021), g: Math.min(0.985, g0 + rnd() * 0.07), k });
+          leaves.push({ dx, dy, rot: rnd() * 6.28, s: unit * (0.0023 + rnd() * 0.0022), g: Math.min(0.985, g0 + rnd() * 0.07), k });
         }
         pads.push({ x, y, rx, ry, z, g0, leaves, twigs, ph: rnd() * 6.28, cv: null, popped: false });
       };
@@ -2380,16 +2417,42 @@ function GreenBG() {
         mkPad(t[0], t[1] + unit * 0.005, unit * 0.06, unit * 0.028, 0.2, t[3]);
         mkPad(nodes[1].x - wind * unit * 0.022, nodes[1].y - unit * 0.055, unit * 0.066, unit * 0.03, -0.2, nodes[1].g + 0.15);
       }
-      // hanging aerial roots (ficus signature)
       const nH = 2 + Math.floor(rnd() * 2);
       for (let i = 0; i < nH; i++) {
         const s = spine[6 + Math.floor(rnd() * 12)];
         hangs.push({ x: s.x + J(-6, 6), y: s.y, dx: J(-0.03, 0.03) * unit, g0: 0.5 + rnd() * 0.2, ph: rnd() * 6.28 });
       }
       for (let i = 0; i < 12; i++) grass.push({ x: baseX + (rnd() - 0.5) * unit * 0.2, l: unit * (0.009 + rnd() * 0.013), a: (rnd() - 0.5) * 0.9, ph: rnd() * 6.28 });
+
+      /* ---- fit the whole tree inside the viewport, any screen ---- */
+      let minX = baseX, maxX = baseX, minY = baseY;
+      const consider = (x, y) => { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; };
+      for (const s of spine) { consider(s.x - s.w * 1.6, s.y); consider(s.x + s.w * 1.6, s.y); }
+      for (const b of branches) for (const p of b.pts) consider(p[0], p[1]);
+      for (const p of pads) { consider(p.x - p.rx * 1.15, p.y - p.ry * 1.7); consider(p.x + p.rx * 1.15, p.y); }
+      const sTop = (baseY - H * 0.05) / Math.max(1, baseY - minY);
+      const sL = (baseX - W * 0.03) / Math.max(1, baseX - minX);
+      const sR = (W * 0.97 - baseX) / Math.max(1, maxX - baseX);
+      const S = Math.min(1, sTop, sL, sR);
+      if (S < 1) {
+        const fx = (x) => (x - baseX) * S + baseX, fy = (y) => (y - baseY) * S + baseY;
+        for (const s of spine) { s.x = fx(s.x); s.y = fy(s.y); s.w *= S; }
+        for (const b of branches) { b.w0 *= S; b.w1 *= S; for (const p of b.pts) { p[0] = fx(p[0]); p[1] = fy(p[1]); } }
+        for (const p of pads) {
+          p.x = fx(p.x); p.y = fy(p.y); p.rx *= S; p.ry *= S;
+          for (const l of p.leaves) { l.dx *= S; l.dy *= S; l.s *= S; }
+          for (const tw of p.twigs) { tw.x2 *= S; tw.y2 *= S; }
+        }
+        for (const hg of hangs) { hg.x = fx(hg.x); hg.y = fy(hg.y); hg.dx *= S; }
+      }
+      for (let j = 0; j < spine.length; j++) {
+        const a = spine[Math.max(0, j - 1)], b = spine[Math.min(spine.length - 1, j + 1)];
+        const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
+        spine[j].nx = -dy / L; spine[j].ny = dx / L; spine[j].u = j / (spine.length - 1);
+      }
       pads.sort((a, b) => a.z - b.z);
       branches.sort((a, b) => a.z - b.z);
-      tree = { spine, strands, branches, pads, grass, hangs, nodes, style };
+      tree = { spine, strands, branches, pads, grass, hangs, style };
     };
 
     const resize = () => {
@@ -2397,72 +2460,53 @@ function GreenBG() {
       W = innerWidth; H = innerHeight;
       canvas.width = W * DPR; canvas.height = H * DPR;
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      build();
+      mkBark(); mkLeafSprites();
+      build(); // same seed -> same tree, refit to the new bounds
     };
     addEventListener("resize", resize); resize();
 
-    const leafCol = (k) => {
-      const dr = 20, dg = 66, db = 38, lr = 132, lg = 214, lb = 148;
-      return "rgb(" + Math.round(dr + (lr - dr) * k) + "," + Math.round(dg + (lg - dg) * k) + "," + Math.round(db + (lb - db) * k) + ")";
-    };
     const strandCol = (depth, tint) => {
-      const l = (0.72 + 0.34 * Math.max(0, depth)) * (1 + tint);
-      return "rgb(" + Math.round(128 * l) + "," + Math.round(119 * l) + "," + Math.round(105 * l) + ")";
+      const l = (0.7 + 0.34 * Math.max(0, depth)) * (1 + tint);
+      return "rgb(" + Math.round(126 * l) + "," + Math.round(117 * l) + "," + Math.round(103 * l) + ")";
     };
 
-    /* ---- Mayan carved stone bowl ---- */
+    /* elegant unglazed dark-clay dish (tokoname style) */
     const drawPot = () => {
-      const rx = unit * 0.13, tier = unit * 0.014, bandH = unit * 0.03, lowH = unit * 0.028;
-      const x0 = baseX - rx, topY = baseY;
-      // rim slab
-      let grad = ctx.createLinearGradient(x0, 0, baseX + rx, 0);
-      grad.addColorStop(0, "#6E675B"); grad.addColorStop(0.35, "#A79E8C"); grad.addColorStop(0.7, "#948B7A"); grad.addColorStop(1, "#5C564B");
-      ctx.fillStyle = grad;
-      ctx.fillRect(x0, topY, rx * 2, tier);
-      // glyph band (slightly inset)
-      const bx = baseX - rx * 0.94, bw = rx * 1.88, by = topY + tier;
-      grad = ctx.createLinearGradient(bx, 0, bx + bw, 0);
-      grad.addColorStop(0, "#645D51"); grad.addColorStop(0.4, "#9C937F"); grad.addColorStop(1, "#544E43");
-      ctx.fillStyle = grad;
-      ctx.fillRect(bx, by, bw, bandH);
-      // step-fret (greca) carving across the band
-      ctx.strokeStyle = "rgba(38,33,26,.75)"; ctx.lineWidth = 1.6; ctx.lineJoin = "miter"; ctx.lineCap = "butt";
-      const cell = bandH * 1.15;
-      for (let cx0 = bx + 4; cx0 < bx + bw - cell; cx0 += cell) {
-        const p = cell, yTop = by + bandH * 0.2, yMid = by + bandH * 0.52, yBot = by + bandH * 0.82;
-        ctx.beginPath();
-        ctx.moveTo(cx0, yBot); ctx.lineTo(cx0, yTop); ctx.lineTo(cx0 + p * 0.62, yTop);
-        ctx.lineTo(cx0 + p * 0.62, yMid); ctx.lineTo(cx0 + p * 0.28, yMid); ctx.lineTo(cx0 + p * 0.28, yBot * 0.994);
-        ctx.stroke();
-        ctx.fillStyle = "rgba(38,33,26,.55)";
-        ctx.fillRect(cx0 + p * 0.75, yMid, p * 0.14, p * 0.14);
-      }
-      // carved highlight under rim
-      ctx.strokeStyle = "rgba(235,228,210,.28)"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(bx, by + 0.5); ctx.lineTo(bx + bw, by + 0.5); ctx.stroke();
-      // lower taper + plinth
-      const ly = by + bandH;
-      grad = ctx.createLinearGradient(baseX - rx * 0.9, 0, baseX + rx * 0.9, 0);
-      grad.addColorStop(0, "#57513F"); grad.addColorStop(0.4, "#8B8272"); grad.addColorStop(1, "#4B463C");
+      const rx = unit * 0.115, h = unit * 0.042;
+      const grad = ctx.createLinearGradient(0, baseY, 0, baseY + h);
+      grad.addColorStop(0, "#453B31"); grad.addColorStop(0.55, "#332B23"); grad.addColorStop(1, "#241E18");
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.moveTo(baseX - rx * 0.9, ly); ctx.lineTo(baseX + rx * 0.9, ly);
-      ctx.lineTo(baseX + rx * 0.7, ly + lowH); ctx.lineTo(baseX - rx * 0.7, ly + lowH);
+      ctx.moveTo(baseX - rx, baseY);
+      ctx.bezierCurveTo(baseX - rx * 1.01, baseY + h * 0.62, baseX - rx * 0.88, baseY + h * 0.94, baseX - rx * 0.72, baseY + h * 0.94);
+      ctx.lineTo(baseX + rx * 0.72, baseY + h * 0.94);
+      ctx.bezierCurveTo(baseX + rx * 0.88, baseY + h * 0.94, baseX + rx * 1.01, baseY + h * 0.62, baseX + rx, baseY);
       ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "#4E483E";
-      ctx.fillRect(baseX - rx * 0.8, ly + lowH, rx * 1.6, tier);
-      // weathering cracks
-      ctx.strokeStyle = "rgba(30,26,20,.5)"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(x0 + rx * 0.3, topY + 2); ctx.lineTo(x0 + rx * 0.36, by + bandH * 0.7); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(baseX + rx * 0.55, by + 3); ctx.lineTo(baseX + rx * 0.48, ly + lowH * 0.6); ctx.stroke();
+      // foot ring
+      ctx.fillStyle = "#1D1813";
+      ctx.fillRect(baseX - rx * 0.5, baseY + h * 0.94, rx, h * 0.09);
+      // soft sheen, single incised line — quiet, high-end
+      const sheen = ctx.createLinearGradient(baseX - rx, 0, baseX + rx * 0.3, 0);
+      sheen.addColorStop(0, "rgba(214,200,180,0)"); sheen.addColorStop(0.45, "rgba(214,200,180,.10)"); sheen.addColorStop(1, "rgba(214,200,180,0)");
+      ctx.fillStyle = sheen;
+      ctx.beginPath();
+      ctx.moveTo(baseX - rx, baseY);
+      ctx.bezierCurveTo(baseX - rx * 1.01, baseY + h * 0.62, baseX - rx * 0.88, baseY + h * 0.94, baseX - rx * 0.72, baseY + h * 0.94);
+      ctx.lineTo(baseX + rx * 0.72, baseY + h * 0.94);
+      ctx.bezierCurveTo(baseX + rx * 0.88, baseY + h * 0.94, baseX + rx * 1.01, baseY + h * 0.62, baseX + rx, baseY);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(baseX - rx * 0.93, baseY + h * 0.42); ctx.lineTo(baseX + rx * 0.93, baseY + h * 0.42); ctx.stroke();
+      // rim edge light
+      ctx.strokeStyle = "rgba(226,212,192,.30)"; ctx.lineWidth = 1.1;
+      ctx.beginPath(); ctx.moveTo(baseX - rx, baseY); ctx.lineTo(baseX + rx, baseY); ctx.stroke();
       // soil
-      ctx.fillStyle = "#221B13";
-      ctx.beginPath(); ctx.ellipse(baseX, topY + 1, rx * 0.9, tier * 0.55, 0, 0, 6.283); ctx.fill();
-      ctx.fillStyle = "rgba(70,190,121,.3)";
-      for (let i = 0; i < 10; i++) { ctx.beginPath(); ctx.arc(baseX + Math.sin(i * 2.1) * rx * 0.66, topY + Math.cos(i * 1.7) * tier * 0.3, 1.2, 0, 6.283); ctx.fill(); }
+      ctx.fillStyle = "#1E1812";
+      ctx.beginPath(); ctx.ellipse(baseX, baseY + 1, rx * 0.9, unit * 0.008, 0, 0, 6.283); ctx.fill();
+      ctx.fillStyle = "rgba(70,190,121,.28)";
+      for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.arc(baseX + Math.sin(i * 2.1) * rx * 0.62, baseY + Math.cos(i * 1.7) * unit * 0.004, 1.1, 0, 6.283); ctx.fill(); }
     };
 
-    /* ---- braided trunk: strands weave over and under the spine ---- */
     const drawTrunk = (g) => {
       const S = tree.spine;
       let M = 0;
@@ -2474,50 +2518,43 @@ function GreenBG() {
           for (let j = 0; j < M; j++) {
             const s0 = S[j], s1 = S[j + 1];
             const th0 = s0.u * st.freq * 6.283 + st.phase;
-            const depth = Math.cos(th0 + 3.14 * 0.5 * 0); // depth of this crossing
-            if ((pass < 0 && Math.cos(th0) >= 0) || (pass > 0 && Math.cos(th0) < 0)) continue;
-            // root flare: strands splay wide near the base
+            const th1 = s1.u * st.freq * 6.283 + st.phase;
+            const d0 = Math.cos(th0);
+            if ((pass < 0 && d0 >= 0) || (pass > 0 && d0 < 0)) continue;
             const flare0 = 1 + Math.max(0, 1 - s0.u * 7) * 1.1;
             const flare1 = 1 + Math.max(0, 1 - s1.u * 7) * 1.1;
-            const amp0 = s0.w * 0.55 * flare0, amp1 = s1.w * 0.55 * flare1;
-            const th1 = s1.u * st.freq * 6.283 + st.phase;
-            const o0 = Math.sin(th0) * amp0, o1 = Math.sin(th1) * amp1;
-            const d0 = Math.cos(th0);
+            const o0 = Math.sin(th0) * s0.w * 0.55 * flare0;
+            const o1 = Math.sin(th1) * s1.w * 0.55 * flare1;
+            if (Math.abs(o1 - o0) > (s0.w + s1.w)) continue; // never draw cross-jumps
             const w = Math.max(1, (s0.w * st.wf) * (0.82 + 0.22 * Math.max(0, d0)));
-            // dark contact shadow beneath each strand
-            ctx.strokeStyle = "rgba(26,21,15,.5)"; ctx.lineWidth = w + 1.6;
-            ctx.beginPath(); ctx.moveTo(s0.x + s0.nx * o0 + 0.8, s0.y + s0.ny * o0 + 1); ctx.lineTo(s1.x + s1.nx * o1 + 0.8, s1.y + s1.ny * o1 + 1); ctx.stroke();
+            const x0 = s0.x + s0.nx * o0, y0 = s0.y + s0.ny * o0;
+            const x1 = s1.x + s1.nx * o1, y1 = s1.y + s1.ny * o1;
+            ctx.strokeStyle = "rgba(24,19,13,.5)"; ctx.lineWidth = w + 1.6;
+            ctx.beginPath(); ctx.moveTo(x0 + 0.8, y0 + 1); ctx.lineTo(x1 + 0.8, y1 + 1); ctx.stroke();
             ctx.strokeStyle = strandCol(d0, st.tint); ctx.lineWidth = w;
-            ctx.beginPath(); ctx.moveTo(s0.x + s0.nx * o0, s0.y + s0.ny * o0); ctx.lineTo(s1.x + s1.nx * o1, s1.y + s1.ny * o1); ctx.stroke();
-            // light catch on front strands
-            if (d0 > 0.25) {
-              ctx.strokeStyle = "rgba(226,214,190,.24)"; ctx.lineWidth = Math.max(0.5, w * 0.3);
-              ctx.beginPath(); ctx.moveTo(s0.x + s0.nx * o0 - w * 0.24, s0.y + s0.ny * o0 - 0.4); ctx.lineTo(s1.x + s1.nx * o1 - w * 0.24, s1.y + s1.ny * o1 - 0.4); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+            if (barkPat && w > 2.2) {
+              ctx.strokeStyle = barkPat; ctx.lineWidth = w * 0.92; ctx.globalAlpha = 0.55;
+              ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+              ctx.globalAlpha = 1;
             }
           }
         }
       }
-      // growth sparks at the braid's rising tip
-      if (!reduced && S[M].g < 0.98 && g < S[S.length - 1].g && rnd() < 0.6 && sparks.length < 90) {
-        sparks.push({ x: S[M].x + J(-4, 4), y: S[M].y, vx: J(-0.4, 0.4), vy: J(-0.9, -0.2), life: 1, s: J(1, 2.4) });
+      if (!reduced && S[M].g < 0.97 && g < S[S.length - 1].g && Math.random() < 0.6 && sparks.length < 90) {
+        sparks.push({ x: S[M].x + (Math.random() - 0.5) * 8, y: S[M].y, vx: (Math.random() - 0.5) * 0.8, vy: -0.2 - Math.random() * 0.7, life: 1, s: 1 + Math.random() * 1.4 });
       }
     };
 
-    /* smooth tapered limbs: layered sub-paths, no segment blobs */
     const drawLimb = (b, g) => {
       const t = (g - b.g0) / (b.g1 - b.g0);
-      if (t <= 0) return false;
+      if (t <= 0) return;
       const e = sm(Math.min(1, t));
       const n = b.pts.length - 1;
       const m = Math.max(1, Math.round(e * n));
       ctx.lineCap = "round"; ctx.lineJoin = "round";
-      // shadow underlay
-      ctx.strokeStyle = "rgba(26,21,15,.45)"; ctx.lineWidth = b.w0 * 0.9;
-      ctx.beginPath(); ctx.moveTo(b.pts[0][0] + 1, b.pts[0][1] + 1.2);
-      for (let j = 1; j <= Math.max(1, Math.round(m * 0.6)); j++) ctx.lineTo(b.pts[j][0] + 1, b.pts[j][1] + 1.2);
-      ctx.stroke();
+      const col = strandCol(0.35, b.tint);
       const L = 5;
-      const col = strandCol(0.4, b.tint);
       for (let k = 0; k < L; k++) {
         const end = Math.max(1, Math.round(m * (1 - k / L * 0.85)));
         ctx.strokeStyle = col;
@@ -2526,22 +2563,23 @@ function GreenBG() {
         for (let j = 1; j <= end; j++) ctx.lineTo(b.pts[j][0], b.pts[j][1]);
         ctx.stroke();
       }
-      ctx.strokeStyle = "rgba(226,214,190,.18)"; ctx.lineWidth = Math.max(0.5, b.w0 * 0.22);
-      ctx.beginPath(); ctx.moveTo(b.pts[0][0] - b.w0 * 0.2, b.pts[0][1] - 0.5);
-      for (let j = 1; j <= m; j++) ctx.lineTo(b.pts[j][0] - b.w0 * 0.2, b.pts[j][1] - 0.5);
-      ctx.stroke();
-      if (!reduced && e < 1 && rnd() < 0.4 && sparks.length < 90) {
-        const tip = b.pts[m];
-        sparks.push({ x: tip[0], y: tip[1], vx: J(-0.4, 0.4), vy: J(-0.9, -0.2), life: 1, s: J(1, 2.2) });
+      if (barkPat && b.w0 > 2.6) {
+        ctx.strokeStyle = barkPat; ctx.lineWidth = b.w0 * 0.75; ctx.globalAlpha = 0.45;
+        ctx.beginPath(); ctx.moveTo(b.pts[0][0], b.pts[0][1]);
+        for (let j = 1; j <= Math.round(m * 0.7); j++) ctx.lineTo(b.pts[j][0], b.pts[j][1]);
+        ctx.stroke(); ctx.globalAlpha = 1;
       }
-      return true;
+      if (!reduced && e < 1 && Math.random() < 0.4 && sparks.length < 90) {
+        const tip = b.pts[m];
+        sparks.push({ x: tip[0], y: tip[1], vx: (Math.random() - 0.5) * 0.8, vy: -0.2 - Math.random() * 0.7, life: 1, s: 1 + Math.random() * 1.2 });
+      }
     };
 
     const padCache = (p) => {
-      const padPx = 8;
+      const padPx = 10;
       const cw = Math.ceil(p.rx * 2 + padPx * 2), ch = Math.ceil(p.ry * 2 + padPx * 2 + p.ry);
       const cv = document.createElement("canvas");
-      cv.width = cw * DPR; cv.height = ch * DPR;
+      cv.width = Math.max(1, cw * DPR); cv.height = Math.max(1, ch * DPR);
       const c = cv.getContext("2d"); c.setTransform(DPR, 0, 0, DPR, 0, 0);
       const cx = cw / 2, cy = p.ry + padPx;
       c.fillStyle = "rgba(8,24,14,.5)";
@@ -2549,8 +2587,11 @@ function GreenBG() {
       c.strokeStyle = "rgba(70,60,48,.6)"; c.lineWidth = 1.1; c.lineCap = "round";
       for (const tw of p.twigs) { c.beginPath(); c.moveTo(cx, cy + p.ry * 0.2); c.lineTo(cx + tw.x2, cy + tw.y2); c.stroke(); }
       for (const l of p.leaves) {
-        c.fillStyle = leafCol(l.k);
-        c.beginPath(); c.ellipse(cx + l.dx, cy + l.dy, l.s, l.s * 0.5, l.rot, 0, 6.283); c.fill();
+        const spr = leafSprites[Math.min(4, Math.floor(l.k * 5))];
+        const lw = l.s * 3.4, lh = lw * 0.57;
+        c.save(); c.translate(cx + l.dx, cy + l.dy); c.rotate(l.rot);
+        c.drawImage(spr, -lw / 2, -lh / 2, lw, lh);
+        c.restore();
       }
       p.cv = cv; p.cw = cw; p.ch = ch;
     };
@@ -2562,11 +2603,11 @@ function GreenBG() {
         const sw = reduced ? 0 : Math.sin(time * 0.55 + p.ph) * 1.6;
         if (!p.popped && !reduced) {
           p.popped = true;
-          for (let i = 0; i < 7 && sparks.length < 90; i++) sparks.push({ x: p.x + J(-p.rx, p.rx) * 0.5, y: p.y, vx: J(-0.6, 0.6), vy: J(-1, -0.3), life: 1, s: J(1, 2.6) });
+          for (let i = 0; i < 7 && sparks.length < 90; i++) sparks.push({ x: p.x + (Math.random() - 0.5) * p.rx, y: p.y, vx: (Math.random() - 0.5) * 1.2, vy: -0.3 - Math.random() * 0.7, life: 1, s: 1 + Math.random() * 1.6 });
         }
         if (g > p.g0 + 0.19) {
           if (!p.cv) padCache(p);
-          ctx.drawImage(p.cv, 0, 0, p.cv.width, p.cv.height, p.x - p.cw / 2 + sw, p.y - (p.ry + 8), p.cw, p.ch);
+          ctx.drawImage(p.cv, 0, 0, p.cv.width, p.cv.height, p.x - p.cw / 2 + sw, p.y - (p.ry + 10), p.cw, p.ch);
         } else {
           ctx.fillStyle = "rgba(8,24,14," + (0.5 * e).toFixed(3) + ")";
           ctx.beginPath(); ctx.ellipse(p.x + sw, p.y + p.ry * 0.35, p.rx * 1.02 * e, p.ry * 0.95 * e, 0, 0, 6.283); ctx.fill();
@@ -2576,14 +2617,15 @@ function GreenBG() {
             if (g < l.g) continue;
             const ls = l.s * sm(Math.min(1, (g - l.g) / 0.045));
             if (ls < 0.25) continue;
-            ctx.fillStyle = leafCol(l.k);
-            ctx.beginPath(); ctx.ellipse(p.x + l.dx + sw, p.y + l.dy, ls, ls * 0.5, l.rot, 0, 6.283); ctx.fill();
+            const [r2, g2b, b2] = leafColRGB(l.k);
+            ctx.fillStyle = "rgb(" + r2 + "," + g2b + "," + b2 + ")";
+            ctx.beginPath(); ctx.ellipse(p.x + l.dx + sw, p.y + l.dy, ls * 1.4, ls * 0.7, l.rot, 0, 6.283); ctx.fill();
           }
         }
       }
     };
 
-    let g = 0;
+    let g = 0, grew = false;
     const tick = (now) => {
       if (killed) return;
       raf = requestAnimationFrame(tick);
@@ -2592,12 +2634,27 @@ function GreenBG() {
       drawAmbient(ctx, W, H, time, scrollY, 1);
       if (!tree) return;
       const max = document.documentElement.scrollHeight - innerHeight;
-      const raw = max > 0 ? Math.min(1, (scrollY / max) / 0.85) : 0;
+      const frac = max > 0 ? Math.min(1, scrollY / max) : 0;
+      const raw = Math.min(1, frac / 0.8);
       const seedT = reduced ? 1 : Math.min(1, (now - seedStart) / 1100);
       const target = seedT < 1 ? 0 : raw;
-      g = reduced ? target : g + (target - g) * 0.06;
+      g = reduced ? target : g + (target - g) * 0.07;
+      // life-cycle: fully grown + reaching the very bottom -> dissolve upward;
+      // returning to the seed after a full grow plants a NEW tree.
+      const fade = frac > 0.86 ? 1 - sm(Math.min(1, (frac - 0.86) / 0.13)) : 1;
+      if (g > 0.35) grew = true;
+      if (grew && g < 0.015) {
+        grew = false;
+        treeSeed = Math.floor(Math.random() * 1e9);
+        seedStart = now;
+        sparks.length = 0;
+        build();
+      }
 
       drawPot();
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.translate(0, -(1 - fade) * unit * 0.05);
       const gg = Math.min(1, g / 0.1);
       if (gg > 0.01) {
         ctx.strokeStyle = "rgba(70,190,121,.45)"; ctx.lineWidth = 1.2;
@@ -2610,26 +2667,30 @@ function GreenBG() {
       }
       if (seedT < 1 || g < 0.035) {
         const falling = seedT < 1;
-        const sy = falling ? 86 + (baseY - unit * 0.02 - 86) * (seedT * seedT) : baseY - unit * 0.014;
-        const glowR = 17 + (reduced ? 0 : Math.sin(time * 2.6) * 4);
+        const sy = falling ? 86 + (baseY - unit * 0.018 - 86) * sm(seedT) : baseY - unit * 0.012;
+        const glowR = 15 + (reduced ? 0 : Math.sin(time * 2.4) * 3.5);
         const gl = ctx.createRadialGradient(baseX, sy, 0, baseX, sy, glowR);
-        gl.addColorStop(0, "rgba(120,235,165,.55)"); gl.addColorStop(0.5, "rgba(70,190,121,.24)"); gl.addColorStop(1, "rgba(70,190,121,0)");
+        gl.addColorStop(0, "rgba(120,235,165,.5)"); gl.addColorStop(0.55, "rgba(70,190,121,.2)"); gl.addColorStop(1, "rgba(70,190,121,0)");
         ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(baseX, sy, glowR, 0, 6.283); ctx.fill();
-        ctx.save(); ctx.translate(baseX, sy); if (falling && !reduced) ctx.rotate(seedT * 4);
-        ctx.fillStyle = "#6B4F35"; ctx.beginPath(); ctx.ellipse(0, 0, 4.5, 6.5, 0.3, 0, 6.283); ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,.3)"; ctx.beginPath(); ctx.ellipse(-1.2, -1.8, 1.2, 2, 0.3, 0, 6.283); ctx.fill();
+        // polished seed: deep mahogany teardrop with a quiet specular arc
+        ctx.save(); ctx.translate(baseX, sy); if (falling && !reduced) ctx.rotate(seedT * 3);
+        const sg = ctx.createRadialGradient(-1.2, -2, 0.5, 0, 0, 7);
+        sg.addColorStop(0, "#7A5A3C"); sg.addColorStop(0.55, "#553D28"); sg.addColorStop(1, "#332417");
+        ctx.fillStyle = sg;
+        ctx.beginPath(); ctx.ellipse(0, 0, 4.2, 6, 0.25, 0, 6.283); ctx.fill();
+        ctx.strokeStyle = "rgba(255,244,225,.35)"; ctx.lineWidth = 0.9;
+        ctx.beginPath(); ctx.ellipse(0, 0, 3.1, 4.8, 0.25, 3.6, 4.9); ctx.stroke();
         ctx.restore();
       }
       drawPads(tree.pads.filter(p => p.z < 0), g, time);
       drawTrunk(g);
       for (const b of tree.branches) drawLimb(b, g);
-      // aerial roots drop late, swaying gently
       for (const hgt of tree.hangs) {
         const t = (g - hgt.g0) / 0.15;
         if (t <= 0) continue;
         const e = sm(Math.min(1, t));
         const sway = reduced ? 0 : Math.sin(time * 0.8 + hgt.ph) * 2;
-        ctx.strokeStyle = "rgba(150,138,120,.8)"; ctx.lineWidth = 1.6; ctx.lineCap = "round";
+        ctx.strokeStyle = "rgba(132,120,102,.75)"; ctx.lineWidth = 1.5; ctx.lineCap = "round";
         ctx.beginPath(); ctx.moveTo(hgt.x, hgt.y);
         ctx.quadraticCurveTo(hgt.x + hgt.dx * 0.6 + sway, hgt.y + (baseY - hgt.y) * 0.6 * e, hgt.x + hgt.dx + sway, hgt.y + (baseY - hgt.y) * e);
         ctx.stroke();
@@ -2640,10 +2701,11 @@ function GreenBG() {
         const s = sparks[i];
         s.x += s.vx; s.y += s.vy; s.vy -= 0.01; s.life -= 0.022;
         if (s.life <= 0) { sparks.splice(i, 1); continue; }
-        ctx.fillStyle = "rgba(140,240,175," + (0.55 * s.life).toFixed(3) + ")";
+        ctx.fillStyle = "rgba(140,240,175," + (0.5 * s.life).toFixed(3) + ")";
         ctx.beginPath(); ctx.arc(s.x, s.y, s.s * s.life, 0, 6.283); ctx.fill();
       }
       ctx.globalCompositeOperation = "source-over";
+      ctx.restore();
     };
     raf = requestAnimationFrame(tick);
     return () => { killed = true; cancelAnimationFrame(raf); removeEventListener("resize", resize); };
@@ -2662,8 +2724,8 @@ function LeafIcon() {
 
 const ECO_POINTS = [
   {
-    t: "Local AI, in-house",
-    d: "Our AI systems are engineered to run on local hardware — in our shop and in yours. Your prompts and tokens aren't shipped off to sprawling data centres; they're processed in-house, on machines we build, tune, and maintain ourselves."
+    t: "Designed to run local",
+    d: "Our systems are designed to run locally for our clients — prompts, tokens, and data staying inside your organization, safeguarding its integrity and security while offering a greener approach to AI than routing every request through distant data centres. Private by design, lighter on the planet by default."
   },
   {
     t: "A smaller footprint",
