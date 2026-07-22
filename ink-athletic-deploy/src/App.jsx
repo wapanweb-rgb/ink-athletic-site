@@ -523,8 +523,12 @@ function startOrbEngine(canvas, refs, cinemaEl) {
   let target=0,p=0,mouseX=0,mouseY=0,mx=0,my=0,camD=8.4;
 
   function resize(){
-    DPR=Math.min(devicePixelRatio||1, innerWidth<820?1.5:2);
-    W=innerWidth;H=innerHeight;
+    const wNew=innerWidth,hNew=innerHeight;
+    // mobile URL-bar jitter: same width + small height shrink -> keep canvas
+    if(W===wNew&&H>0&&hNew<=H&&H-hNew<160)return;
+    DPR=Math.min(devicePixelRatio||1, wNew<820?1.5:2);
+    const hUse=(wNew===W&&H>0)?Math.max(hNew,H):hNew;
+    W=wNew;H=hUse;
     canvas.width=W*DPR;canvas.height=H*DPR;
     ctx.setTransform(DPR,0,0,DPR,0,0);
     CX=W/2;CY=H/2;
@@ -1454,8 +1458,11 @@ function AmbientBG() {
     const ctx = canvas.getContext("2d");
     let W = 0, H = 0, raf = 0, killed = false;
     const resize = () => {
-      const DPR = Math.min(devicePixelRatio || 1, innerWidth < 820 ? 1.5 : 2);
-      W = innerWidth; H = innerHeight;
+      const wNew = innerWidth, hNew = innerHeight;
+      if (W === wNew && H > 0 && hNew <= H && H - hNew < 160) return; // URL-bar jitter
+      const DPR = Math.min(devicePixelRatio || 1, wNew < 820 ? 1.5 : 2);
+      const hUse = (wNew === W && H > 0) ? Math.max(hNew, H) : hNew;
+      W = wNew; H = hUse;
       canvas.width = W * DPR; canvas.height = H * DPR;
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     };
@@ -2897,8 +2904,13 @@ function GreenBG() {
     };
 
     const resize = () => {
+      const wNew = innerWidth, hNew = innerHeight;
+      // mobile URL-bar jitter: ignore small same-width height shrinks so the
+      // tree never rebuilds (and never jumps) mid-scroll
+      if (W === wNew && H > 0 && hNew <= H && H - hNew < 160) return;
       DPR = Math.min(devicePixelRatio || 1, 2);
-      W = innerWidth; H = innerHeight;
+      const hUse = (wNew === W && H > 0) ? Math.max(hNew, H) : hNew;
+      W = wNew; H = hUse;
       canvas.width = W * DPR; canvas.height = H * DPR;
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
       mkBark(); mkLeafSprites();
@@ -3134,7 +3146,7 @@ function GreenBG() {
       // capture every visible element so the wavefronts can push them
       if (!reduced && prevSeedT < 1 && seedT >= 1) {
         ripple = {
-          t0: now, x: baseX, y: baseY - unit * 0.018,
+          t0: now, x: baseX, y: baseY - unit * 0.018, sy0: scrollY,
           els: Array.from(document.querySelectorAll(".eco-card, .greenpage h1, .greenpage h2, .greenpage p, .greenpage a, nav"))
             .filter(el => el.matches(".eco-card") || !el.closest(".eco-card"))
             .map(el => { const r = el.getBoundingClientRect();
@@ -3237,6 +3249,12 @@ function GreenBG() {
           for (const e of ripple.els) { e.el.style.transform = e.prevT || ""; e.el.style.transition = e.prevTr || ""; }
           ripple = null;
         } else {
+          // if the user scrolls mid-wave, element positions go stale — let go
+          // of the DOM immediately (the rings finish on their own)
+          if (ripple.els.length && Math.abs(scrollY - ripple.sy0) > 30) {
+            for (const e of ripple.els) { e.el.style.transform = e.prevT || ""; e.el.style.transition = e.prevTr || ""; }
+            ripple.els = [];
+          }
           const speed = 860, band = 150;
           for (let i = 0; i < 5; i++) {
             const lt = rt - i * 0.13;
