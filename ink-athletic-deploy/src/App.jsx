@@ -299,16 +299,73 @@ function startOrbEngine(canvas, refs, cinemaEl) {
     const hotN=inlay?4:2+(variant%2);
     for(let t=0;t<hotN;t++)trace(true);
     for(let t=0;t<2;t++)trace(false);
-    // corner rivets
-    for(const [rx,ry] of [[24,24],[232,24],[24,232],[232,232]]){
-      g.fillStyle="rgba(12,13,17,0.9)";g.beginPath();g.arc(rx,ry,6,0,6.283);g.fill();
-      g.fillStyle="rgba(212,214,220,0.5)";g.beginPath();g.arc(rx-2,ry-2,2.2,0,6.283);g.fill();
+    // ---- mirror inset: a polished dark pane set ~10px inside the face ----
+    const mPath=()=>{g.beginPath();g.moveTo(128,46);g.lineTo(217,215);g.lineTo(39,215);g.closePath();};
+    g.save();mPath();g.clip();
+    const mg=g.createLinearGradient(56,46,222,215);
+    mg.addColorStop(0,"#181B23");mg.addColorStop(0.44,"#232833");
+    mg.addColorStop(0.56,inlay?"#3A2530":"#2B3140");mg.addColorStop(1,"#111420");
+    g.fillStyle=mg;g.fillRect(0,0,S,S);
+    // faint reflection streaks in the glass
+    for(let i=0;i<6;i++){
+      g.strokeStyle=`rgba(214,222,235,${(0.03+Math.random()*0.05).toFixed(3)})`;
+      g.lineWidth=1+Math.random()*4;
+      const x=30+Math.random()*200;
+      g.beginPath();g.moveTo(x,30);g.lineTo(x-64,230);g.stroke();
+    }
+    g.restore();
+    // bevel: dark outer cut + light inner lip
+    mPath();g.strokeStyle="rgba(6,7,10,0.85)";g.lineWidth=3;g.stroke();
+    g.save();g.translate(-1,-1);mPath();g.strokeStyle="rgba(216,222,232,0.30)";g.lineWidth=1.1;g.stroke();g.restore();
+    // small red triangle at the heart of the mirror (echoes the logo mark)
+    const tri=()=>{g.beginPath();g.moveTo(128,116);g.lineTo(159,178);g.lineTo(97,178);g.closePath();};
+    g.save();g.shadowColor="rgba(255,68,82,0.95)";g.shadowBlur=16;
+    tri();g.fillStyle="rgba(255,68,82,0.16)";g.fill();
+    tri();g.strokeStyle="rgba(255,68,82,0.9)";g.lineWidth=3;g.stroke();g.restore();
+    tri();g.strokeStyle="rgba(255,216,222,0.9)";g.lineWidth=1.1;g.stroke();
+    // rivets at the face corners
+    for(const [rx,ry] of [[128,36],[224,220],[32,220]]){
+      g.fillStyle="rgba(12,13,17,0.9)";g.beginPath();g.arc(rx,ry,5,0,6.283);g.fill();
+      g.fillStyle="rgba(212,214,220,0.5)";g.beginPath();g.arc(rx-1.6,ry-1.6,1.8,0,6.283);g.fill();
     }
     return c;
   }
   const TEXTURES=[0,1,2,3,4].map(v=>makeTexture(v,false));
   const TEX_INLAY=[0,3].map(v=>makeTexture(v,true));
   const UV=[[128,28],[232,224],[24,224]];
+  // scrolling code strip for the mirror surfaces (red, glowing)
+  const CODE_TEX=(()=>{
+    const c=document.createElement("canvas");c.width=256;c.height=512;
+    const g=c.getContext("2d");
+    const chars="01<>{}/=+*#&$%!?ABCDEF";
+    g.font="11px 'JetBrains Mono',monospace";g.textBaseline="top";
+    for(let col=0;col<15;col++){
+      const x=8+col*16.6;
+      for(let row=0;row<36;row++){
+        if(Math.random()<0.34)continue;
+        const y=4+row*14;
+        const bright=Math.random()<0.14;
+        if(bright){g.save();g.shadowColor="rgba(255,68,82,0.95)";g.shadowBlur=7;
+          g.fillStyle="rgba(255,190,196,0.95)";
+          g.fillText(chars[(Math.random()*chars.length)|0],x,y);g.restore();}
+        else{g.fillStyle=`rgba(255,68,82,${(0.14+Math.random()*0.4).toFixed(3)})`;
+          g.fillText(chars[(Math.random()*chars.length)|0],x,y);}
+      }
+    }
+    return c;
+  })();
+  // travelling light band for the mirror sheen (same feel as the pyramid icons)
+  const SHEEN_TEX=(()=>{
+    const c=document.createElement("canvas");c.width=440;c.height=256;
+    const g=c.getContext("2d");
+    g.translate(220,128);g.rotate(-0.35);
+    const sg=g.createLinearGradient(-90,0,90,0);
+    sg.addColorStop(0,"rgba(255,255,255,0)");sg.addColorStop(0.42,"rgba(255,255,255,0.16)");
+    sg.addColorStop(0.5,"rgba(255,170,178,0.13)");sg.addColorStop(0.58,"rgba(255,255,255,0.16)");
+    sg.addColorStop(1,"rgba(255,255,255,0)");
+    g.fillStyle=sg;g.fillRect(-160,-260,320,520);
+    return c;
+  })();
 
   const ORB_R=2.05;
   const shards=[];
@@ -654,6 +711,19 @@ function startOrbEngine(canvas, refs, cinemaEl) {
     ctx.save();
     ctx.transform(a,b,c,d,e,f);
     ctx.drawImage(tex,0,0);
+    // living mirror: red code scrolls up the inset pane while a light band
+    // sweeps across it (per-face phase so the shards never sync)
+    const tN=performance.now()*0.001, phx=(x0*0.013+y0*0.007)%6.283;
+    ctx.beginPath();ctx.moveTo(128,46);ctx.lineTo(217,215);ctx.lineTo(39,215);ctx.closePath();ctx.clip();
+    const off=(tN*30+phx*40)%512;
+    ctx.globalAlpha=0.75;
+    ctx.drawImage(CODE_TEX,0,off-512);
+    ctx.drawImage(CODE_TEX,0,off);
+    ctx.globalCompositeOperation="lighter";
+    ctx.globalAlpha=0.6;
+    const sx=(((tN*52)+phx*90)%740)-500;
+    ctx.drawImage(SHEEN_TEX,sx,0);
+    ctx.globalAlpha=1;ctx.globalCompositeOperation="source-over";
     ctx.restore();
     const bx=Math.min(x0,x1,x2)-1,by=Math.min(y0,y1,y2)-1,
           bw=Math.abs(Math.max(x0,x1,x2)-Math.min(x0,x1,x2))+2,
@@ -1833,7 +1903,7 @@ function OrbCinema({ site }) {
         <div className="rays" />
         <div className="rays r2" />
         <div className="lockup">
-          <svg className="lmark" viewBox="0 0 100 84" aria-hidden="true">
+          <svg className="lmark" viewBox="0 0 98 88" aria-hidden="true">
             <defs>
               <linearGradient id="lmW" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#C7CBD3" />
@@ -1842,9 +1912,9 @@ function OrbCinema({ site }) {
                 <stop offset="0" stopColor="#B4B9C2" /><stop offset="1" stopColor="#7C8089" />
               </linearGradient>
             </defs>
-            <polygon points="12,80 32,80 58,4 42,4" fill="url(#lmW)" />
-            <polygon points="60,14 74,14 94,60 80,60" fill="url(#lmS)" />
-            <polygon points="42,62 64,62 53,40" fill="#FF4650" />
+            <polygon points="43.2,12.6 57.2,12.6 76,84 62,84" fill="url(#lmS)" />
+            <polygon points="22,84 36,84 56,8 42,8" fill="url(#lmW)" />
+            <polygon points="42,68 56,68 49,52" fill="#FF4650" />
           </svg>
           <div className="lg">Ink Athletic Ltd.</div>
           <div className="rule"><div className="beam" /></div>
