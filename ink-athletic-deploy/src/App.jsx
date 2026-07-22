@@ -563,6 +563,27 @@ function startOrbEngine(canvas, refs, cinemaEl) {
     g.moveTo(hubR,0);
     g.arc(0,0,hubR,0,Math.PI*2,true);
   }
+  // spline-smooth gear silhouette: every tooth tip and valley rounded with
+  // quadratic curves through edge midpoints — reads as a sculpted 3D object
+  function gearPathSmooth(g,R,teeth,toothH,hubR){
+    const n=teeth*2,pts=[];
+    for(let i=0;i<n;i++){
+      const a=i/n*Math.PI*2;
+      const r=(i%2===0)?R:R-toothH;
+      pts.push([Math.cos(a)*r,Math.sin(a)*r]);
+    }
+    g.beginPath();
+    const mid=(p,q)=>[(p[0]+q[0])/2,(p[1]+q[1])/2];
+    const m0=mid(pts[n-1],pts[0]);
+    g.moveTo(m0[0],m0[1]);
+    for(let i=0;i<n;i++){
+      const p=pts[i],m=mid(p,pts[(i+1)%n]);
+      g.quadraticCurveTo(p[0],p[1],m[0],m[1]);
+    }
+    g.closePath();
+    g.moveTo(hubR,0);
+    g.arc(0,0,hubR,0,Math.PI*2,true);
+  }
   function drawMechSparks(assembleT,fadeOutT,scale){
     // assembleT: 0 -> 1 as sparks fly inward and gather. fadeOutT: 0 -> 1 once the
     // mechanism itself has solidified, dissolving the sparks back to nothing.
@@ -646,7 +667,7 @@ function startOrbEngine(canvas, refs, cinemaEl) {
       ctx.shadowColor="rgba(0,0,0,0.6)";ctx.shadowBlur=13;
       ctx.shadowOffsetX=5;ctx.shadowOffsetY=7;
       ctx.fillStyle="rgba(8,8,10,0.85)";
-      gearPath(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
+      gearPathSmooth(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
       ctx.fill("evenodd");
       ctx.restore();
       // extruded side wall — the wheel has thickness
@@ -656,27 +677,44 @@ function startOrbEngine(canvas, refs, cinemaEl) {
       side.addColorStop(0,`rgba(96,100,110,${0.95*gr.w})`);
       side.addColorStop(1,`rgba(26,27,32,${0.95*gr.w})`);
       ctx.fillStyle=side;
-      gearPath(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
+      gearPathSmooth(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
       ctx.fill("evenodd");
       ctx.restore();
-      // chrome top face
+      // top face: each gear is its own metal (platinum, silver, nickel...)
       ctx.save();
       ctx.rotate(rot);
+      const T=gr.tone||[255,255,255];
+      const cs=(f,a)=>`rgba(${Math.round(T[0]*f)},${Math.round(T[1]*f)},${Math.round(T[2]*f)},${a})`;
       const met=ctx.createRadialGradient(-gr.R*0.38,-gr.R*0.38,gr.R*0.05,0,0,gr.R*1.02);
-      met.addColorStop(0,`rgba(255,255,255,${0.98*gr.w})`);
-      met.addColorStop(0.22,`rgba(228,232,239,${0.96*gr.w})`);
-      met.addColorStop(0.48,`rgba(170,175,186,${0.92*gr.w})`);
-      met.addColorStop(0.74,`rgba(112,116,127,${0.92*gr.w})`);
-      met.addColorStop(1,`rgba(58,61,70,${0.92*gr.w})`);
+      met.addColorStop(0,cs(1,0.98*gr.w));
+      met.addColorStop(0.22,cs(0.90,0.96*gr.w));
+      met.addColorStop(0.48,cs(0.66,0.92*gr.w));
+      met.addColorStop(0.74,cs(0.44,0.92*gr.w));
+      met.addColorStop(1,cs(0.23,0.92*gr.w));
       ctx.fillStyle=met;
-      gearPath(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
+      gearPathSmooth(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
       ctx.fill("evenodd");
+      // spun-metal finish: fine radial machining streaks, unique per gear,
+      // rotating with the wheel like a real lathe-turned face
+      const seed=gr.x*3.7+gr.y*1.3;
+      ctx.save();
+      gearPathSmooth(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
+      ctx.clip("evenodd");
+      for(let i=0;i<64;i++){
+        const a=(i/64)*6.283+Math.sin(i*7.3+seed)*0.05;
+        const al=0.02+0.05*Math.abs(Math.sin(i*2.7+seed));
+        ctx.strokeStyle=i%2?`rgba(255,255,255,${al.toFixed(3)})`:`rgba(10,11,14,${(al*1.25).toFixed(3)})`;
+        ctx.lineWidth=0.8;
+        ctx.beginPath();ctx.moveTo(Math.cos(a)*(gr.hub+1),Math.sin(a)*(gr.hub+1));
+        ctx.lineTo(Math.cos(a)*(gr.R-1),Math.sin(a)*(gr.R-1));ctx.stroke();
+      }
+      ctx.restore();
       // tooth bevels: lit flank / shaded flank
       ctx.save();ctx.translate(-0.8,-0.8);
-      gearPath(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
+      gearPathSmooth(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
       ctx.strokeStyle=`rgba(255,255,255,${0.35*gr.w})`;ctx.lineWidth=1;ctx.stroke();ctx.restore();
       ctx.save();ctx.translate(0.8,0.8);
-      gearPath(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
+      gearPathSmooth(ctx,gr.R,gr.teeth,gr.tooth,gr.hub);
       ctx.strokeStyle="rgba(10,11,14,0.55)";ctx.lineWidth=1;ctx.stroke();ctx.restore();
       const r1=gr.R-gr.tooth-4,r0=gr.hub+7;
       if(gr.R>=28&&r1-r0>10){
@@ -686,19 +724,27 @@ function startOrbEngine(canvas, refs, cinemaEl) {
           const win=()=>{ctx.beginPath();ctx.arc(0,0,r1-3,a0,a1);
             ctx.arc(0,0,r0+3,a1,a0,true);ctx.closePath();};
           win();ctx.fillStyle="rgba(13,13,16,0.92)";ctx.fill();
+          // ambient occlusion inside the cutout
+          ctx.save();win();ctx.clip();
+          ctx.shadowColor="rgba(0,0,0,0.85)";ctx.shadowBlur=6;ctx.shadowOffsetX=2;ctx.shadowOffsetY=3;
+          win();ctx.strokeStyle="rgba(0,0,0,0.6)";ctx.lineWidth=2.5;ctx.stroke();ctx.restore();
           win();ctx.strokeStyle="rgba(0,0,0,0.55)";ctx.lineWidth=1.6;ctx.stroke();
           ctx.save();ctx.translate(-0.7,-0.7);win();
-          ctx.strokeStyle="rgba(255,255,255,0.16)";ctx.lineWidth=0.9;ctx.stroke();ctx.restore();
+          ctx.strokeStyle="rgba(255,255,255,0.2)";ctx.lineWidth=0.9;ctx.stroke();ctx.restore();
         }
-        // bolts on the four spokes, each with a screw slot
+        // dome-head bolts on the four spokes — tiny polished spheres
         for(let k=0;k<4;k++){
           const a=k*1.5708,rB=(r0+r1)/2;
           const bx=Math.cos(a)*rB,by=Math.sin(a)*rB;
-          ctx.fillStyle="rgba(52,54,62,0.95)";
-          ctx.beginPath();ctx.arc(bx,by,3,0,6.283);ctx.fill();
-          ctx.fillStyle="rgba(235,238,244,0.7)";
-          ctx.beginPath();ctx.arc(bx-0.9,by-0.9,1.1,0,6.283);ctx.fill();
-          ctx.strokeStyle="rgba(14,15,18,0.8)";ctx.lineWidth=0.9;
+          ctx.fillStyle="rgba(0,0,0,0.4)";
+          ctx.beginPath();ctx.arc(bx+1,by+1.4,3.2,0,6.283);ctx.fill();
+          const bg2=ctx.createRadialGradient(bx-1.1,by-1.1,0.3,bx,by,3.4);
+          bg2.addColorStop(0,"rgba(255,255,255,0.98)");
+          bg2.addColorStop(0.45,"rgba(190,195,206,0.96)");
+          bg2.addColorStop(1,"rgba(46,48,56,0.95)");
+          ctx.fillStyle=bg2;
+          ctx.beginPath();ctx.arc(bx,by,3.2,0,6.283);ctx.fill();
+          ctx.strokeStyle="rgba(14,15,18,0.7)";ctx.lineWidth=0.9;
           ctx.beginPath();ctx.moveTo(bx-2,by);ctx.lineTo(bx+2,by);ctx.stroke();
         }
         // engraved index ticks on the outer rim band
@@ -730,21 +776,65 @@ function startOrbEngine(canvas, refs, cinemaEl) {
       ctx.strokeStyle=`rgba(255,255,255,${0.2*gr.w})`;ctx.lineWidth=1.2;
       ctx.beginPath();ctx.arc(0,0,gr.R*0.8,sa+2.9,sa+3.6);ctx.stroke();
       ctx.restore();
-      // platinum hub with a red jewel core
-      const hubG=ctx.createRadialGradient(-2,-2,1,0,0,gr.hub*0.7);
-      hubG.addColorStop(0,"rgba(250,252,255,0.95)");hubG.addColorStop(0.6,"rgba(180,185,196,0.95)");hubG.addColorStop(1,"rgba(90,94,104,0.95)");
-      ctx.fillStyle=hubG;ctx.beginPath();ctx.arc(0,0,gr.hub*0.62,0,6.283);ctx.fill();
-      ctx.save();ctx.shadowColor="rgba(255,68,82,0.9)";ctx.shadowBlur=8;
-      ctx.fillStyle="#FF4650";ctx.beginPath();ctx.arc(0,0,gr.hub*0.26,0,6.283);ctx.fill();ctx.restore();
+      // slow sweeping gleam wedge — a soft sheet of light crossing the face
+      const wa=-2.2+Math.sin(time*0.23+seed)*0.55;
+      const wg2=ctx.createRadialGradient(0,0,gr.hub,0,0,gr.R);
+      wg2.addColorStop(0,"rgba(255,255,255,0)");
+      wg2.addColorStop(0.7,`rgba(255,255,255,${0.11*gr.w})`);
+      wg2.addColorStop(1,"rgba(255,255,255,0)");
+      ctx.save();ctx.globalCompositeOperation="lighter";
+      ctx.fillStyle=wg2;
+      ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,gr.R,wa,wa+0.85);ctx.closePath();ctx.fill();
+      // red environment light reflected on the shadow side — two-light setup
+      ctx.strokeStyle=`rgba(255,68,82,${0.2*gr.w})`;ctx.lineWidth=2;
+      ctx.shadowColor="rgba(255,68,82,0.6)";ctx.shadowBlur=6;
+      ctx.beginPath();ctx.arc(0,0,gr.R-1.5,0.5,1.6);ctx.stroke();
+      ctx.restore();
+      // pulsing star glints at the rim
+      for(let s2=0;s2<2;s2++){
+        const ga=seed+s2*2.6;
+        const gx2=Math.cos(ga)*(gr.R*0.72),gy2=Math.sin(ga)*(gr.R*0.72);
+        const tw=Math.pow(Math.max(0,Math.sin(time*1.7+seed+s2*3.1)),6);
+        if(tw>0.03){
+          ctx.save();ctx.globalCompositeOperation="lighter";
+          ctx.strokeStyle=`rgba(255,255,255,${(0.75*tw).toFixed(2)})`;ctx.lineWidth=1.1;
+          const L2=3+5*tw;
+          ctx.beginPath();ctx.moveTo(gx2-L2,gy2);ctx.lineTo(gx2+L2,gy2);
+          ctx.moveTo(gx2,gy2-L2);ctx.lineTo(gx2,gy2+L2);ctx.stroke();
+          ctx.restore();
+        }
+      }
+      // hub: a raised platinum torus with a domed ruby set in its center
+      ctx.fillStyle="rgba(0,0,0,0.4)";
+      ctx.beginPath();ctx.arc(1.2,1.8,gr.hub*0.72,0,6.283);ctx.fill();
+      const hubG=ctx.createRadialGradient(-gr.hub*0.25,-gr.hub*0.25,1,0,0,gr.hub*0.78);
+      hubG.addColorStop(0,"rgba(255,255,255,0.98)");
+      hubG.addColorStop(0.5,"rgba(196,201,212,0.96)");
+      hubG.addColorStop(1,"rgba(70,73,84,0.95)");
+      ctx.fillStyle=hubG;ctx.beginPath();ctx.arc(0,0,gr.hub*0.72,0,6.283);ctx.fill();
+      ctx.strokeStyle="rgba(20,21,26,0.7)";ctx.lineWidth=1;
+      ctx.beginPath();ctx.arc(0,0,gr.hub*0.72,0,6.283);ctx.stroke();
+      // torus inner shadow ring
+      ctx.strokeStyle="rgba(0,0,0,0.45)";ctx.lineWidth=1.6;
+      ctx.beginPath();ctx.arc(0.6,0.8,gr.hub*0.42,0,6.283);ctx.stroke();
+      // domed ruby: deep red sphere with a hot specular point
+      ctx.save();ctx.shadowColor="rgba(255,68,82,0.95)";ctx.shadowBlur=10;
+      const jg=ctx.createRadialGradient(-gr.hub*0.12,-gr.hub*0.12,0.4,0,0,gr.hub*0.34);
+      jg.addColorStop(0,"rgba(255,214,219,1)");
+      jg.addColorStop(0.35,"rgba(255,84,96,0.98)");
+      jg.addColorStop(1,"rgba(136,8,20,0.96)");
+      ctx.fillStyle=jg;ctx.beginPath();ctx.arc(0,0,gr.hub*0.34,0,6.283);ctx.fill();ctx.restore();
+      ctx.fillStyle="rgba(255,255,255,0.9)";
+      ctx.beginPath();ctx.arc(-gr.hub*0.12,-gr.hub*0.13,gr.hub*0.07+0.4,0,6.283);ctx.fill();
       ctx.restore();
     }
     const gears=[
-      {x:0,y:0,R:86,teeth:26,tooth:9,hub:16,spd:0.22,w:1},
-      {x:-58,y:-46,R:44,teeth:14,tooth:7,hub:9,spd:-0.41,w:0.92},
-      {x:62,y:-38,R:36,teeth:11,tooth:6.5,hub:8,spd:-0.53,w:0.88},
-      {x:34,y:66,R:30,teeth:9,tooth:6,hub:7,spd:0.64,w:0.85},
-      {x:-20,y:-92,R:18,teeth:8,tooth:4.5,hub:5,spd:0.98,w:0.8},
-      {x:98,y:26,R:16,teeth:7,tooth:4,hub:4.5,spd:-1.1,w:0.8}
+      {x:0,y:0,R:86,teeth:26,tooth:9,hub:16,spd:0.22,w:1,tone:[255,255,255]},      // platinum
+      {x:-58,y:-46,R:44,teeth:14,tooth:7,hub:9,spd:-0.41,w:0.92,tone:[226,236,252]}, // cool silver
+      {x:62,y:-38,R:36,teeth:11,tooth:6.5,hub:8,spd:-0.53,w:0.88,tone:[255,240,226]},// warm nickel
+      {x:34,y:66,R:30,teeth:9,tooth:6,hub:7,spd:0.64,w:0.85,tone:[206,212,228]},   // gunmetal
+      {x:-20,y:-92,R:18,teeth:8,tooth:4.5,hub:5,spd:0.98,w:0.8,tone:[255,232,238]}, // rose platinum
+      {x:98,y:26,R:16,teeth:7,tooth:4,hub:4.5,spd:-1.1,w:0.8,tone:[240,246,255]}   // bright silver
     ];
     for(const gr of gears)drawGear(gr,time*gr.spd+(gr.x+gr.y));
     // ---- escapement: sawtooth escape wheel + rocking pallet anchor ----
